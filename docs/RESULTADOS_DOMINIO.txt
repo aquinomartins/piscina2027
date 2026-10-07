@@ -1,0 +1,36 @@
+PASS Aprovação concorrente concede 160000 centavos e uma NFT
+PASS Depósito concorrente com mesma chave não duplica; conflito de conteúdo
+PASS Retirada pública em mR$, cotas independentes e redepósito
+PASS 10 BYC não retiram por 11; pagamento único em mR$
+PASS Retiradas concorrentes: somente vencedor paga
+PASS Venda de 3 BYC por mR$90 sem emissão; segunda aprovação única
+PASS Ciclo por BYC custa 1 BYC líquido e não destrói cota
+PASS Venda de NFT preserva criador, venda de cota não acompanha NFT
+PASS Contraproposta libera reservas e invalida versão anterior
+PASS Proposta não reserva patrimônio alheio; saldo reservado não pode gastar
+PASS Expiração na ação libera recursos, mesmo antes do cron
+PASS Cancelamento e segunda aprovação concorrentes têm um único desfecho
+PASS Revisão e aprovação concorrentes preservam versão e reservas
+PASS Dois gastos incompatíveis não criam saldo negativo
+PASS N4 Q10 q3: bruto 240, taxa 100, líquido 140; participante sem cotas
+PASS Venda depois do corte não transfere direito, cron atrasado usa snapshot
+PASS Maiores restos: 6667,6667,6666; soma conserva D
+PASS N=0 Q=0 e taxa com saldo insuficiente permanecem válidos
+PASS Parâmetros novos não reescrevem obrigações nem cotação anterior
+PASS Produção não presume política nem data inicial
+PASS Precisão decimal, escala mR$, limites e JSON strings
+PASS Autorização: cadastro pendente e ativos de terceiros não movimentam
+PASS Retomada de processamento em lotes não publica direitos parciais
+PASS Períodos atrasados preservam retratos ordenados distintos
+PASS Reconciliação detecta adulteração de saldo agregado
+PASS Transação atravessa corte: eficácia pelo gate e snapshot anterior à próxima alteração
+PASS Uploads concorrentes preservam direito único e mesma chave usa hash do conteúdo
+PASS Falha de imagem não consome envio; somente criador autorizado
+PASS Tokens de e-mail e recuperação expiram, uso único e senha revoga sessões
+PASS Anúncio não liquida nem reserva; cancelamento remove publicação
+PASS Preço zero ou fração com total zero mantém entrega e não cria pagamento fictício
+PASS Deadlock MySQL real faz rollback e tentativa limitada sem duplicar efeitos
+PASS Cron recupera calendário longo por lotes; operação não ultrapassa cortes pendentes
+PASS Gasto novo libera reserva vencida do autor antes de validar saldo
+
+34 cenários, 0 falhas. MySQL 8.0.46-0ubuntu0.24.04.4, PHP 8.3.6

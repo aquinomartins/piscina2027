@@ -1,0 +1,1 @@
+{"name":"piscina-liquidez-dev","private":true,"description":"Ferramentas locais opcionais; Node não é usado em produção","scripts":{"test:browser":"node tests/browser.cjs"},"devDependencies":{"playwright":"1.62.1"}}
