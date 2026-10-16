@@ -68,6 +68,10 @@ Há 34 cenários com MySQL real, inclusive processos/conexões independentes par
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
+Menu de instalação e atualização: `npm run test:pwa` executa o frontend real com API simulada e service workers reais em servidor local, sem banco ou senhas. Verifica sete larguras na raiz e em subpasta, instalação, aviso de atualização no menu e na tela inicial, ativação explícita e proteção de operações pendentes. Configure `CHROMIUM_PATH` se necessário.
+
+Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/build-packages.py` em um checkout Git. Python é ferramenta opcional de desenvolvimento e não integra o pacote de produção. O script usa somente arquivos versionados dos diretórios permitidos e exclui configuração privada e dados locais.
+
 ## Documentação
 
 - [Regras e transições](docs/REGRAS.md)

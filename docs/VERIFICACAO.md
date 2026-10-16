@@ -51,3 +51,17 @@ Cache observado contém apenas a lista de CSS/JS/fonte/ícones/placeholder/offli
 ZIPs gerados de lista de arquivos permitidos, excluindo configuração real, sessões, imagens/dados locais, bancos, backups, .git e runtimes de trabalho. Produção exclui também testes/gerador demo/Node. Verificação do ZIP deve confirmar ausência de segredos/dados e integridade antes de transferi-lo.
 
 Os ZIPs completo e de produção são disponibilizados na pasta `downloads/` do repositório, acompanhados dos hashes SHA-256. O pacote de produção contém apenas os arquivos necessários à aplicação e à sua instalação, sem testes nem gerador de demonstração.
+
+## Menu do usuário e atualização PWA — 16/10/2026
+
+Executado `TEST_ARTIFACTS=/workspace/work/pwa-menu node tests/pwa-menu.cjs` com Chromium real. A suíte serve o JavaScript/CSS do projeto, usa o cabeçalho e o diálogo do template PHP e simula a API localmente; não acessa banco nem produção. O comportamento do service worker é real.
+
+- Menu com nome do usuário, ações existentes, **Baixar o app** e **Atualizar app**, sem alteração da navegação mobile original.
+- Raiz e `/piscina/`, em 320, 360, 390, 412, 700, 701 e 1440 px: controles visíveis, área de toque de pelo menos 44 px e sem rolagem horizontal. Capturas de 390/1440 px foram inspecionadas.
+- Download chama o prompt de instalação quando fornecido pelo navegador; a alternativa mostra instruções para Safari/iPhone e Android/desktop. O evento de prompt foi simulado; não se declarou instalação em dispositivo físico.
+- Primeira instalação sem aviso falso nem recarga. Detecção de versão nova com o menu aberto e de worker já aguardando na abertura da página.
+- Atualização efetiva por dois caminhos: botão do menu na raiz e aviso da tela inicial em subpasta. Ambos ativam o worker real e recarregam uma única vez após a troca do controlador.
+- Operação em andamento ou resultado desconhecido impedem a ativação. O aviso desaparece depois da atualização; cache permanece sem HTML dinâmico/API.
+- Logout preservado; opções do app também acessíveis no menu de entrada. Nenhum erro JavaScript não tratado nas jornadas.
+
+Sintaxe de `public/assets/app.js`, `public/sw.js` e `tests/pwa-menu.cjs` verificada com `node --check`. A suíte comprova o fluxo de interface e atualização; não substitui os testes de autenticação/backend nem a homologação da hospedagem.
