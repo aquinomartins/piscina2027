@@ -1,4 +1,4 @@
-const CACHE='piscina-static-v2';
+const CACHE='piscina-static-v1';
 const ROOT=new URL('./',self.location.href);
 const ASSETS=['assets/app.css','assets/app.js','assets/inter-latin.woff2','assets/placeholder.svg','icons/icon.svg','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','offline.html'].map(p=>new URL(p,ROOT).href);
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
