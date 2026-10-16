@@ -86,7 +86,7 @@ document.addEventListener('click',async event=>{const el=event.target.closest('[
  const action=el.dataset.action,id=el.dataset.id;
  try{switch(action){
  case'close':if(state.busy){toast('Aguarde o resultado da operação atual.');break;}dialog.close();break;
- case'account':if(!state.user)modal(`<h2>Entre na piscina.</h2>${loginForm()}<button class="text-button" data-action="register">Criar conta</button><button class="text-button" data-action="reset">Esqueci minha senha</button>`);else modal(`<h2>${esc(state.user.display_name)}</h2><p>${labels[state.user.status]}</p><button class="secondary" data-view="dashboard">Meu portfólio</button><form data-form="auth.logout"><button class="text-button">Sair desta conta</button></form>`);break;
+ case'account':openAccountMenu();break;
  case'register':modal('<h2>Faça parte da piscina.</h2><p>Verifique seu e-mail e aguarde aprovação. Na primeira aprovação, receba mR$ 1.600 e uma NFT.</p><form data-form="auth.register"><label>Identificação pública<input name="display_name" autocomplete="nickname" required minlength="2" maxlength="80"></label><label>E-mail<input name="email" type="email" autocomplete="email" required></label><label>Senha (12 a 72 caracteres)<input name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="72"></label><button class="primary">Criar conta →</button></form>');break;
  case'reset':modal('<h2>Recuperar acesso.</h2><p>Enviaremos um link de uso único.</p><form data-form="auth.request_reset"><label>E-mail<input name="email" type="email" autocomplete="email" required></label><button class="primary">Enviar instruções</button></form>');break;
  case'resend-verify':toast((await api('auth.request_verify',{email:state.user.email})).message);break;
@@ -118,6 +118,7 @@ document.addEventListener('click',async event=>{const el=event.target.closest('[
  case'more-dashboard':state.offset+=24;state.dashboard=await api(`dashboard&offset=${state.offset}`);state.view==='history'?renderHistory():renderPending();break;
  case'recover':if(!state.unknown)break;const unknown=state.unknown;const result=await api(`operation&action=${encodeURIComponent(unknown.action)}&key=${encodeURIComponent(unknown.key)}`);state.unknown=null;dialog.close();toast('Resultado confirmado. Recibo '+result.operation_id);await navigate(state.view,false);break;
  case'install':await installApp();break;
+ case'app-update':applyAppUpdate();break;
  }}catch(e){toast(e.message,true);}
 });
 let searchTimer;document.addEventListener('input',event=>{if(event.target.id==='search'){clearTimeout(searchTimer);searchTimer=setTimeout(async()=>{state.query=event.target.value;state.offset=0;try{await loadMarket();}catch(e){toast(e.message,true);}},350);}if(event.target.id==='participant-search'){clearTimeout(searchTimer);searchTimer=setTimeout(async()=>{const d=await api(`market&q=${encodeURIComponent(event.target.value)}`);document.querySelector('#participant-results').innerHTML=d.users.filter(u=>u.id!==state.user.id).map(u=>`<button type="button" class="secondary" data-action="choose-party" data-id="${u.id}">${esc(u.display_name)} · #${u.id}</button>`).join('');},350);}});
@@ -128,7 +129,42 @@ window.addEventListener('online',()=>{connectivity();toast('Conexão recuperada.
 let installPrompt=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;});
 async function installApp(){if(installPrompt){installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;}else modal('<h2>Leve a piscina com você.</h2><div class="install-instructions"><p><strong>iPhone / iPad:</strong> no Safari, abra Compartilhar e escolha “Adicionar à Tela de Início”.</p><p><strong>Android / desktop:</strong> no menu do navegador, escolha “Instalar app” ou “Adicionar à tela inicial”, quando disponível.</p><p>Abra pelo endereço HTTPS final. Você poderá precisar entrar novamente na versão instalada.</p></div>');}
 let registration=null,shouldRefresh=false;
-if('serviceWorker'in navigator){navigator.serviceWorker.register(`${base}/sw.js`,{scope:`${base}/`}).then(reg=>{registration=reg;const update=()=>{if(reg.waiting)document.querySelector('#update-banner').hidden=false;};update();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',update));}).catch(()=>{});document.querySelector('#apply-update').addEventListener('click',()=>{if(state.busy||state.unknown){toast('Finalize ou consulte a operação antes de atualizar.');return;}shouldRefresh=true;registration?.waiting?.postMessage({type:'ACTIVATE'});});let refresh=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(shouldRefresh&&!refresh){refresh=true;location.reload();}});}
+function openAccountMenu(){
+ const account=state.user?`<h2>${esc(state.user.display_name)}</h2><p>${labels[state.user.status]}</p><button class="secondary" data-view="dashboard">Meu portfólio</button><form data-form="auth.logout"><button class="text-button">Sair desta conta</button></form>`:`<h2>Entre na piscina.</h2>${loginForm()}<button class="text-button" data-action="register">Criar conta</button><button class="text-button" data-action="reset">Esqueci minha senha</button>`;
+ modal(account+`<div class="account-app-actions"><button type="button" class="secondary" data-action="install">${icon('install')} Baixar o app</button><button type="button" class="secondary" data-action="app-update" disabled><span>Atualizar app</span><span class="state-badge" data-app-update-badge hidden>Disponível</span></button><p class="muted" data-app-update-status role="status"></p></div>`);
+ syncAppUpdate();
+ // Verifica uma versão nova ao abrir o menu, sem ativá-la automaticamente.
+ registration?.update().then(syncAppUpdate).catch(()=>{});
+}
+function syncAppUpdate(){
+ const available=Boolean(navigator.serviceWorker?.controller&&registration?.waiting);
+ const banner=document.querySelector('#update-banner');if(banner)banner.hidden=!available;
+ const homeButton=document.querySelector('#apply-update');if(homeButton)homeButton.disabled=shouldRefresh;
+ const menuButton=dialogContent.querySelector('[data-action="app-update"]');
+ if(menuButton)menuButton.disabled=!available||shouldRefresh;
+ const badge=dialogContent.querySelector('[data-app-update-badge]');if(badge)badge.hidden=!available;
+ const status=dialogContent.querySelector('[data-app-update-status]');
+ if(status)status.textContent=shouldRefresh?'Atualizando app…':available?'Uma nova versão está pronta para instalar.':'Nenhuma atualização disponível no momento.';
+}
+function applyAppUpdate(){
+ if(state.busy||state.unknown){toast('Finalize ou consulte a operação antes de atualizar.');return;}
+ if(shouldRefresh)return;
+ const worker=registration?.waiting;
+ if(!navigator.serviceWorker?.controller||!worker){syncAppUpdate();toast('Nenhuma atualização disponível no momento.');return;}
+ shouldRefresh=true;
+ try{worker.postMessage({type:'ACTIVATE'});syncAppUpdate();}catch{shouldRefresh=false;syncAppUpdate();toast('Não foi possível atualizar agora. Tente novamente.',true);}
+}
+if('serviceWorker'in navigator){
+ navigator.serviceWorker.register(`${base}/sw.js`,{scope:`${base}/`,updateViaCache:'none'}).then(reg=>{
+  registration=reg;
+  const watchInstalling=()=>{const worker=reg.installing;if(worker)worker.addEventListener('statechange',syncAppUpdate);syncAppUpdate();};
+  reg.addEventListener('updatefound',watchInstalling);
+  watchInstalling();
+ }).catch(()=>{});
+ document.querySelector('#apply-update')?.addEventListener('click',applyAppUpdate);
+ let refresh=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{syncAppUpdate();if(shouldRefresh&&!refresh){refresh=true;location.reload();}});
+}
 dialog.addEventListener('cancel',e=>{if(state.busy)e.preventDefault();});dialog.addEventListener('close',()=>document.querySelectorAll('[data-action=shortcuts]').forEach(b=>b.setAttribute('aria-expanded','false')));
 async function init(){connectivity();try{await meta();if(location.hash.startsWith('#verify=')){const token=location.hash.slice(8);history.replaceState(null,'',location.pathname+location.search);modal(`<h2>Verifique seu e-mail.</h2><form data-form="auth.verify"><input type="hidden" name="token" value="${esc(token)}"><button class="primary">Confirmar e-mail</button></form>`);}else if(location.hash.startsWith('#reset=')){const token=location.hash.slice(7);history.replaceState(null,'',location.pathname+location.search);modal(`<h2>Defina uma nova senha.</h2><form data-form="auth.reset"><input type="hidden" name="token" value="${esc(token)}"><label>Nova senha<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="72" required></label><button class="primary">Redefinir senha</button></form>`);}await navigate(state.view,false);}catch(e){toast(e.message,true);}}
 init();
