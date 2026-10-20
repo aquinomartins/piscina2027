@@ -41,7 +41,8 @@ Tokens aleatórios têm hash SHA-256 armazenado, validade de 24h para e-mail e 1
 | proposal | id | Somente comprador/vendedor; versões e aprovações |
 | quote | nft_id | Aprovado; custo MR/BYC, versão, vencimento de 5 minutos |
 | operation | id **ou** action e key | Somente autor da operação; resultado já comprometido ou 404 unknown |
-| admin | offset | Somente administrador; usuários, regras, períodos, livro agregado, auditoria e reconciliação |
+| admin | q, status, offset | Somente administrador; usuários paginados com saldos e custódia, regras, períodos, livro agregado, auditoria e reconciliação |
+| admin.wallet | user_id, offset | Somente administrador; carteira e extrato contábil de um participante, até 24 lançamentos por página |
 
 Página padrão: 24 itens; busca limitada a 80 caracteres. Dashboard usa mesma paginação para histórico/propostas/direitos/taxas. Acesso por troca de ID a proposta/operação privada é recusado. `image.php?id=ID&thumb=1` entrega JPEG associado ou placeholder; imagens não são executáveis.
 
@@ -84,6 +85,7 @@ Todas as mutações abaixo exigem role admin, CSRF, **password atual** e chave e
 |---|---|
 | admin.activate | confirm=true, rounding=HALF_UP_CENT |
 | admin.approve | user_id; e-mail verificado |
+| admin.approve_without_email | user_id, confirm_without_email=true, reason (5–255 caracteres); mantém e-mail pendente e audita a exceção |
 | admin.mint | user_id, title, reason ≥5 caracteres |
 | admin.parameters | campos monetários decimais opcionais initial_credit, withdraw_money, distribution_base, admin_fee; interval_minutes, first_cutoff ISO futuro, reason |
 | admin.tasks | {} além da senha; usa o mesmo serviço de cron finito |

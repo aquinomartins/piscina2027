@@ -91,4 +91,87 @@ test('Cron recupera calendário longo por lotes; operação não ultrapassa cort
 test('Gasto novo libera reserva vencida do autor antes de validar saldo',function(){
  [$a,$n]=user('Ana');[$b,$m]=user('Bia');$p=proposal($a,$b,'NFT','1','1600.00',false,$m);op($a,'proposal.approve',['proposal_id'=>$p['proposal_id'],'version'=>'1']);db()->run('UPDATE proposal_versions SET expires_at=DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 1 SECOND) WHERE proposal_id=?',[$p['proposal_id']]);op($b,'nft.deposit',['nft_id'=>(string)$m]);withdraw($a,$m);assertSame('20000',balance($a,'MR'));assertSame('0',balance($a,'MR','reserved'));assertSame('EXPIRED',db()->row('SELECT state FROM proposals WHERE id=?',[$p['proposal_id']])['state']);
 });
+test('Aprovação sem e-mail exige admin, motivo e confirmação; não falsifica verificação',function(){
+ $u=pending('SemEmail');db()->run('UPDATE users SET email_verified_at=NULL WHERE id=?',[$u]);[$other]=user('Outro');
+ $payload=['user_id'=>(string)$u,'confirm_without_email'=>true,'reason'=>'Aprovação presencial do participante'];
+ fail(fn()=>op($other,'admin.approve_without_email',$payload),403);
+ fail(fn()=>op(1,'admin.approve',['user_id'=>(string)$u]));
+ fail(fn()=>op(1,'admin.approve_without_email',['user_id'=>(string)$u,'reason'=>'Motivo válido']),422);
+ fail(fn()=>op(1,'admin.approve_without_email',['user_id'=>(string)$u,'confirm_without_email'=>true,'reason'=>'   ']),422);
+ fail(fn()=>op(1,'admin.approve_without_email',['user_id'=>(string)$u,'confirm_without_email'=>'true','reason'=>'Motivo válido']),422);
+ assertSame('pending',service()->user($u)['status']);assertSame('0',balance($u,'MR'));
+ $key=testKey();$r=op(1,'admin.approve_without_email',$payload,$key);assertSame(true,$r['email_verification_bypassed']);
+ assertSame($r['operation_id'],op(1,'admin.approve_without_email',$payload,$key)['operation_id']);
+ op(1,'admin.approve_without_email',$payload);
+ assertSame('approved',service()->user($u)['status']);assertSame(null,service()->user($u)['email_verified_at']);
+ assertSame('160000',balance($u,'MR'));assertSame('0',balance($u,'BYC'));assertSame('0',balance($u,'SHARE'));
+ assertSame(1,db()->row('SELECT COUNT(*) n FROM nfts WHERE creator_id=?',[$u])['n']);
+ assertSame(1,db()->row('SELECT COUNT(*) n FROM initial_grants WHERE user_id=?',[$u])['n']);
+ $audit=db()->row('SELECT actor_id,kind,data FROM audit_events WHERE operation_id=?',[$r['operation_id']]);
+ assertSame(1,$audit['actor_id']);assertSame('admin.approve_without_email',$audit['kind']);
+ $data=json_decode($audit['data'],true);assertSame($payload['reason'],$data['input']['reason']);check($data['result']['email_verification_bypassed'],'Exceção auditada.');
+});
+test('Aprovação excepcional concorrente concede uma única carteira e NFT',function(){
+ $u=pending('Concorrente');db()->run('UPDATE users SET email_verified_at=NULL WHERE id=?',[$u]);
+ $data=['user_id'=>(string)$u,'confirm_without_email'=>true,'reason'=>'Confirmação manual pelo administrador'];
+ $r=concurrent([['actor'=>1,'action'=>'admin.approve_without_email','data'=>$data],['actor'=>1,'action'=>'admin.approve_without_email','data'=>$data]]);
+ check($r[0]['ok']&&$r[1]['ok'],'Ambas concluem sem duplicar concessão.');assertSame('160000',balance($u,'MR'));
+ assertSame(1,db()->row('SELECT COUNT(*) n FROM nfts WHERE creator_id=?',[$u])['n']);assertSame(null,service()->user($u)['email_verified_at']);
+});
+test('Aprovação excepcional respeita limites e rollback da concessão',function(){
+ $u=pending('Limitado');db()->run('UPDATE users SET email_verified_at=NULL WHERE id=?',[$u]);
+ $data=['user_id'=>(string)$u,'confirm_without_email'=>true,'reason'=>'Verificação presencial documentada'];
+ $limited=new Piscina\Domain(db(),array_replace(config(),['max_users'=>0]));
+ fail(fn()=>$limited->operation(1,'admin.approve_without_email',$data,testKey()));
+ $limited=new Piscina\Domain(db(),array_replace(config(),['max_nfts'=>0]));
+ fail(fn()=>$limited->operation(1,'admin.approve_without_email',$data,testKey()));
+ assertSame('pending',service()->user($u)['status']);assertSame('0',balance($u,'MR'));
+ assertSame(0,db()->row('SELECT COUNT(*) n FROM initial_grants WHERE user_id=?',[$u])['n']);
+ assertSame(0,db()->row("SELECT COUNT(*) n FROM operations WHERE action='admin.approve_without_email'")['n']);
+});
+test('Reaprovação de concessão anterior preserva gastos, cotas e NFT',function(){
+ [$u,$n]=user('Anterior');op($u,'nft.deposit',['nft_id'=>(string)$n]);withdraw($u,$n);
+ db()->run("UPDATE users SET status='pending',email_verified_at=NULL WHERE id=?",[$u]);
+ $r=op(1,'admin.approve_without_email',['user_id'=>(string)$u,'confirm_without_email'=>true,'reason'=>'Reaprovação após ajuste cadastral']);
+ assertSame(true,$r['already_granted']);assertSame('approved',service()->user($u)['status']);
+ assertSame('20000',balance($u,'MR'));assertSame('1000000000',balance($u,'BYC'));assertSame('1',balance($u,'SHARE'));
+ assertSame(1,db()->row('SELECT COUNT(*) n FROM nfts WHERE creator_id=?',[$u])['n']);
+});
+test('Carteiras administrativas negam participantes e não vazam para perfil público',function(){
+ [$a,$n]=user('Ana');[$b]=user('Bia');op($a,'nft.deposit',['nft_id'=>(string)$n]);$p=proposal($b,$a,'BYC','3','30.00');
+ $q=new Piscina\Queries(service());fail(fn()=>$q->admin($a,[]),403);fail(fn()=>$q->adminWallet($a,['user_id'=>(string)$b]),403);
+ $before=db()->row('SELECT COUNT(*) n FROM accounts')['n'];$d=$q->admin(1,['q'=>(string)$a]);
+ assertSame(1,count($d['users']));assertSame('700000000',$d['users'][0]['balances']['BYC']['available']);
+ assertSame('300000000',$d['users'][0]['balances']['BYC']['reserved']);assertSame('1',$d['users'][0]['custody']['pool_deposits']);
+ $wallet=$q->adminWallet(1,['user_id'=>(string)$a]);assertSame($a,$wallet['user']['id']);
+ assertSame('300000000',$wallet['balances']['BYC']['reserved']);check(count($wallet['history'])>0,'Extrato disponível.');
+ check(!array_key_exists('password_hash',$wallet['user']),'Senha não exposta.');
+ $public=$q->profile($a);check(!array_key_exists('balances',$public)&&!array_key_exists('email',$public),'Perfil público preservado.');
+ assertSame($before,db()->row('SELECT COUNT(*) n FROM accounts')['n']);
+ op($a,'proposal.cancel',['proposal_id'=>$p['proposal_id'],'version'=>'1']);
+});
+test('Busca administrativa literal e paginação alcançam todos os cadastros sem criar contas',function(){
+ $q=new Piscina\Queries(service());$special=pending('Literal%_Teste');
+ for($i=0;$i<30;$i++)db()->run('INSERT INTO users(email,password_hash,display_name,created_at) VALUES(?,?,?,UTC_TIMESTAMP(6))',['pagina'.$i.'@local.invalid','hash-fixture','Pagina '.$i]);
+ $before=db()->row('SELECT COUNT(*) n FROM accounts')['n'];$first=$q->admin(1,['q'=>'pagina']);$second=$q->admin(1,['q'=>'pagina','offset'=>24]);
+ assertSame('30',$first['users_total']);assertSame(24,count($first['users']));check($first['has_more'],'Mais resultados disponíveis.');assertSame(6,count($second['users']));check(!$second['has_more'],'Última página.');
+ assertSame(30,count(array_unique(array_column(array_merge($first['users'],$second['users']),'id'))));
+ $literal=$q->admin(1,['q'=>'%_']);assertSame(1,count($literal['users']));assertSame($special,$literal['users'][0]['id']);
+ $byEmail=$q->admin(1,['q'=>'pagina29@local.invalid']);assertSame(1,count($byEmail['users']));
+ $approved=$q->admin(1,['status'=>'approved']);assertSame('0',$approved['users_total']);
+ assertSame('0',$first['users'][0]['balances']['MR']['available']);assertSame($before,db()->row('SELECT COUNT(*) n FROM accounts')['n']);
+ fail(fn()=>$q->admin(1,['status'=>'arbitrario']),422);
+});
+test('Extrato administrativo paginado e custódia contam apenas o último depositante',function(){
+ op(1,'admin.parameters',['initial_credit'=>'100000.00','reason'=>'Fixture para extrato paginado']);[$a,$n]=user('Ana');[$b]=user('Bia');
+ for($i=0;$i<9;$i++){op($a,'nft.deposit',['nft_id'=>(string)$n]);withdraw($a,$n);}
+ $q=new Piscina\Queries(service());$one=$q->adminWallet(1,['user_id'=>(string)$a]);$two=$q->adminWallet(1,['user_id'=>(string)$a,'offset'=>24]);
+ assertSame(24,count($one['history']));check($one['has_more'],'Há histórico anterior.');assertSame(4,count($two['history']));check(!$two['has_more'],'Fim do histórico.');
+ assertSame(28,count(array_unique(array_column(array_merge($one['history'],$two['history']),'entry_id'))));
+ assertSame('1',$one['custody']['private_nfts']);assertSame('0',$one['custody']['pool_deposits']);
+ op($a,'nft.deposit',['nft_id'=>(string)$n]);withdraw($b,$n);op($b,'nft.deposit',['nft_id'=>(string)$n]);
+ assertSame('0',$q->adminWallet(1,['user_id'=>(string)$a])['custody']['pool_deposits']);
+ assertSame('1',$q->adminWallet(1,['user_id'=>(string)$b])['custody']['pool_deposits']);
+ fail(fn()=>$q->adminWallet(1,['user_id'=>'999999']),404);
+});
 echo "\n$tests cenários, $failed falhas. MySQL ".db()->row('SELECT VERSION() v')['v'].', PHP '.PHP_VERSION."\n";exit($failed?1:0);

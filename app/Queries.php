@@ -45,12 +45,53 @@ final class Queries {
     }
     public function admin(int $actor,array $d): array {
         $this->domain->admin($actor);$db=$this->domain->db;[$off,$limit]=$this->paging($d);
-        return ['users'=>$db->all("SELECT id,email,display_name,role,status,email_verified_at,approved_at FROM users ORDER BY id DESC LIMIT $limit OFFSET $off"),
+        $q=mb_substr(trim((string)($d['q']??'')),0,80);$status=(string)($d['status']??'');
+        if(!in_array($status,['','pending','approved'],true)) throw new Problem('Filtro de cadastro inválido.');
+        $where='1=1';$args=[];
+        if($q!=='') {
+            $like='%'.str_replace(['\\','%','_'],['\\\\','\\%','\\_'],$q).'%';
+            $where.=' AND (display_name LIKE ? OR email LIKE ? OR CAST(id AS CHAR)=?)';array_push($args,$like,$like,$q);
+        }
+        if($status!=='') {$where.=' AND status=?';$args[]=$status;}
+        // O mesmo gate das operações mantém saldos e custódia coerentes nesta página.
+        $wallets=$db->transaction(function()use($db,$where,$args,$limit,$off){
+            $db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
+            $total=$db->row("SELECT COUNT(*) n FROM users WHERE $where",$args)['n'];
+            $users=$db->all("SELECT id,email,display_name,role,status,email_verified_at,approved_at FROM users WHERE $where ORDER BY id DESC LIMIT $limit OFFSET $off",$args);
+            foreach($users as &$u) {
+                $u['balances']=$this->domain->ledger->balances((int)$u['id']);
+                $u['custody']=$this->adminCustody((int)$u['id']);
+            }
+            unset($u);
+            return ['users'=>$users,'users_total'=>$total];
+        });
+        return $wallets+['offset'=>(string)$off,'has_more'=>$off+count($wallets['users'])<(int)$wallets['users_total'],'query'=>$q,'status_filter'=>$status,
             'parameters'=>$db->all('SELECT * FROM parameter_versions ORDER BY id DESC LIMIT 20'),'decisions'=>$db->all('SELECT * FROM decision_versions ORDER BY id DESC LIMIT 20'),
             'periods'=>$db->all('SELECT * FROM periods ORDER BY cutoff_at DESC LIMIT 24'),'accounts'=>$db->all("SELECT asset,purpose,COUNT(*) accounts,SUM(balance) balance FROM accounts GROUP BY asset,purpose"),
             'obligations'=>$db->all('SELECT state,COUNT(*) n,SUM(amount) amount FROM fees GROUP BY state'),'rights'=>$db->all('SELECT state,COUNT(*) n,SUM(amount) amount FROM rights GROUP BY state'),
             'nfts'=>$db->all('SELECT state,COUNT(*) n FROM nfts GROUP BY state'),'tasks'=>$db->all('SELECT * FROM task_runs ORDER BY id DESC LIMIT 10'),
             'audit'=>$db->all("SELECT id,actor_id,kind,data,created_at FROM audit_events ORDER BY id DESC LIMIT 24 OFFSET $off"),'outbox'=>$db->all('SELECT state,COUNT(*) n FROM outbox GROUP BY state'),
             'reconciliation'=>$db->transaction(function()use($db){$db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return $this->domain->ledger->reconcile();})];
+    }
+    private function adminCustody(int $user): array {
+        return $this->domain->db->row("SELECT
+            (SELECT COUNT(*) FROM nfts WHERE owner_id=? AND state='PRIVATE') private_nfts,
+            (SELECT COUNT(*) FROM nfts n JOIN deposits d ON d.nft_id=n.id
+             WHERE n.state='POOL' AND d.user_id=?
+               AND d.id=(SELECT MAX(last.id) FROM deposits last WHERE last.nft_id=n.id)) pool_deposits",[$user,$user]);
+    }
+    public function adminWallet(int $actor,array $d): array {
+        $this->domain->admin($actor);$user=Domain::id($d['user_id']??null);[$off,$limit]=$this->paging($d);$db=$this->domain->db;
+        return $db->transaction(function()use($db,$user,$off,$limit){
+            $db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
+            $u=$this->domain->user($user);
+            $history=$db->all("SELECT e.id entry_id,t.id transaction_id,t.kind,t.created_at,t.operation_id,a.asset,a.purpose,e.amount
+                FROM ledger_entries e JOIN ledger_transactions t ON t.id=e.transaction_id
+                JOIN accounts a ON a.id=e.account_id WHERE a.user_id=?
+                ORDER BY e.id DESC LIMIT ".($limit+1)." OFFSET $off",[$user]);
+            $hasMore=count($history)>$limit;if($hasMore)array_pop($history);
+            return ['user'=>$u,'balances'=>$this->domain->ledger->balances($user),'custody'=>$this->adminCustody($user),
+                'history'=>$history,'offset'=>(string)$off,'has_more'=>$hasMore];
+        });
     }
 }

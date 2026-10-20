@@ -65,3 +65,15 @@ Executado `TEST_ARTIFACTS=/workspace/work/pwa-menu node tests/pwa-menu.cjs` com 
 - Logout preservado; opções do app também acessíveis no menu de entrada. Nenhum erro JavaScript não tratado nas jornadas.
 
 Sintaxe de `public/assets/app.js`, `public/sw.js` e `tests/pwa-menu.cjs` verificada com `node --check`. A suíte comprova o fluxo de interface e atualização; não substitui os testes de autenticação/backend nem a homologação da hospedagem.
+
+## Administração: carteiras e aprovação excepcional — 20/10/2026
+
+Validação local em PHP **8.3.35**, MySQL **8.0.46** e Chromium. Ambiente isolado, `environment=demo`, banco `piscina_test`, sem acesso à hospedagem ou envio externo de e-mail.
+
+- `php tests/run.php`: **41 cenários, zero falhas**, incluindo os 34 anteriores. Novos casos cobrem aprovação sem e-mail com motivo/confirmação, restrição a administrador, concorrência, repetição sem duplicar ativos, limites/rollback, reaprovação com patrimônio já utilizado, consultas privadas, busca literal, paginação e identificação do último depositante.
+- `node tests/browser.cjs`: **17 verificações aprovadas**, incluindo negociação bilateral, reservas, retirada, upload, distribuição, taxa, logout, offline e manifesto.
+- `node tests/admin-browser.cjs`: **7 grupos de verificações aprovados** com API e banco reais. Incluem 401/403 para acesso indevido, CSRF/senha/motivo/confirmação obrigatórios, cadastro público sem escalada de cargo, e-mail mantido pendente, auditoria, carteira/extrato e logout. Conferida ausência de transbordamento horizontal em **320, 360, 390, 700, 768, 1024 e 1440 px**; screenshots de carteira mobile e Administração desktop inspecionados.
+- `node tests/pwa-menu.cjs`: **6 grupos aprovados**, com instalação/atualização existentes na raiz e em `/piscina`; service workers reais, API simulada. O teste identifica o nome do cache a partir do worker, sem fixar a versão anterior.
+- Sintaxe dos PHP alterados e do fixture verificada; `node --check` e `git diff --check` aprovados.
+
+Nenhum reset ou migração SQL acompanha esta atualização. Alterações de produção devem seguir o [guia de atualização administrativa](ADMIN_CARTEIRAS.md). Testes não representam instalação física em Android/iOS nem validação do servidor da Superdomínios.
