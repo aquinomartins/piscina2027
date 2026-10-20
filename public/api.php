@@ -14,6 +14,7 @@ try {
             'dashboard'=>$queries->dashboard($auth->actor(),$_GET),'proposal'=>$queries->proposal($auth->actor(),Piscina\Domain::id($_GET['id']??null)),
             'quote'=>$domain->quote($auth->actor(),Piscina\Domain::id($_GET['nft_id']??null)),
             'operation'=>$queries->operation($auth->actor(),$_GET),'admin'=>$queries->admin($auth->actor(),$_GET),
+            'admin.wallet'=>$queries->adminWallet($auth->actor(),$_GET),
             default=>throw new Piscina\Problem('Endpoint desconhecido.',404)
         };
     } elseif($method==='POST') {

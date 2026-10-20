@@ -11,6 +11,7 @@ Distribuição D=N×base. Participação D×q/Q, incluindo cotas reservadas, e m
 | Operação | Estado/condições | Resultado atômico |
 |---|---|---|
 | Aprovação | Admin reautenticado, e-mail verificado | aprovado, concessão única, NFT inicial, auditoria |
+| Aprovação sem confirmação de e-mail | Admin reautenticado, confirmação explícita e motivo | aprovado, e-mail continua pendente, concessão única, exceção auditada |
 | Depósito | proprietário aprovado, NFT livre | NA_PISCINA, BYC e cota emitidos, evento |
 | Retirada | aprovado, NFT disponível, termos vigentes | pagamento único à tesouraria, propriedade privada |
 | Proposta | partes aprovadas, termos exatos | AGUARDANDO → PARCIAL → CONCLUIDA |

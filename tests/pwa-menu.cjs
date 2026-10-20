@@ -16,6 +16,7 @@ let version='old',signedIn=true;
  const index=await fs.readFile(path.join(root,'public/index.php'),'utf8');
  const script=await fs.readFile(path.join(root,'public/assets/app.js'),'utf8');
  const worker=await fs.readFile(path.join(root,'public/sw.js'),'utf8');
+ const cacheName=worker.match(/const CACHE='([^']+)'/)[1];
  const svg=index.slice(index.indexOf('<svg class="sprite"'),index.indexOf('</svg>\n<aside')+6);
  const header=index.slice(index.indexOf('<header class="topbar"'),index.indexOf('</header>')+9)
   .replace(/<\?=\s*icon\('([^']+)'\)\s*\?>/g,(_,name)=>icon(name))
@@ -121,7 +122,7 @@ let version='old',signedIn=true;
    assert.equal(await page.locator('#update-banner').isVisible(),false);
    await account();assert.equal(await page.locator('dialog [data-action="app-update"]').isDisabled(),true);
    const cached=await page.evaluate(async()=>{const keys=await caches.keys();return Promise.all(keys.map(async k=>({name:k,urls:(await(await caches.open(k)).keys()).map(r=>new URL(r.url).pathname)})));});
-   assert.ok(cached.some(c=>c.name==='piscina-static-v3'));
+   assert.ok(cached.some(c=>c.name===cacheName));
    assert.ok(cached.every(c=>c.urls.every(u=>!u.endsWith('index.php')&&!u.endsWith('api.php'))));
    report.push(`${base||'/'}: atualização real via ${base?'aviso da tela inicial':'menu'}, waiting pré-existente, bloqueio de operação e recarga única aprovados`);
    await page.locator('dialog form[data-form="auth.logout"] button').click();

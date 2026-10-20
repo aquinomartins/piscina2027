@@ -34,7 +34,8 @@ final class Domain {
             $this->expireActor($actor);
             $result=match($action) {
                 'admin.activate'=>$this->activate($actor,$data), 'admin.parameters'=>$this->setParameters($actor,$data),
-                'admin.approve'=>$this->approveUser($actor,$data), 'admin.mint'=>$this->mint($actor,$data),
+                'admin.approve'=>$this->approveUser($actor,$data),
+                'admin.approve_without_email'=>$this->approveUser($actor,$data,true), 'admin.mint'=>$this->mint($actor,$data),
                 'nft.deposit'=>$this->deposit($actor,$data), 'nft.withdraw'=>$this->withdraw($actor,$data),
                 'proposal.create'=>$this->createProposal($actor,$data), 'proposal.revise'=>$this->reviseProposal($actor,$data),
                 'proposal.approve'=>$this->approveProposal($actor,$data), 'proposal.cancel'=>$this->closeProposal($actor,$data,'CANCELLED'),
@@ -83,10 +84,21 @@ final class Domain {
         $this->db->run('INSERT INTO nfts(creator_id,owner_id,title,created_at) VALUES(?,?,?,?)',[$owner,$owner,$title,$this->effective]);
         $id=$this->db->pdo->lastInsertId(); $this->nftEvent(['id'=>$id,'owner_id'=>null],$actor,'ISSUED',$owner); return $id;
     }
-    private function approveUser(int $actor,array $d): array {
+    private function approveUser(int $actor,array $d,bool $withoutEmail=false): array {
         $this->admin($actor); $this->active(); $id=self::id($d['user_id']??null); $u=$this->user($id);
-        if(!$u['email_verified_at']) throw new Problem('O e-mail precisa ser verificado antes da aprovação.',409);
-        if($this->db->row('SELECT user_id FROM initial_grants WHERE user_id=?',[$id])) return ['user_id'=>(string)$id,'already_granted'=>true];
+        if($withoutEmail) {
+            $reason=trim((string)($d['reason']??''));
+            if(($d['confirm_without_email']??false)!==true || mb_strlen($reason)<5 || mb_strlen($reason)>255)
+                throw new Problem('Confirme a aprovação sem e-mail e informe um motivo de 5 a 255 caracteres.');
+        }
+        if(!$u['email_verified_at'] && !$withoutEmail) throw new Problem('O e-mail precisa ser verificado antes da aprovação.',409);
+        if($this->db->row('SELECT user_id FROM initial_grants WHERE user_id=?',[$id])) {
+            if($u['status']!=='approved') {
+                if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved'")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
+                $this->db->run("UPDATE users SET status='approved',approved_at=? WHERE id=?",[$this->effective,$id]);
+            }
+            return ['user_id'=>(string)$id,'already_granted'=>true,'email_verification_bypassed'=>$withoutEmail&&!$u['email_verified_at']];
+        }
         if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved'")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
         $p=$this->parameters();
         $this->db->run("UPDATE users SET status='approved',approved_at=? WHERE id=?",[$this->effective,$id]);
@@ -94,7 +106,7 @@ final class Domain {
         if($p['initial_credit']!=='0') $this->ledger->issue($id,'MR',$p['initial_credit'],"grant:$id",$this->op);
         $nft=$this->newNft($id,$actor,'Primeira obra de '.$u['display_name']);
         $this->notify($id,'Cadastro aprovado. Crédito simulado e NFT inicial concedidos.');
-        return ['user_id'=>(string)$id,'nft_id'=>$nft,'credit'=>$p['initial_credit']];
+        return ['user_id'=>(string)$id,'nft_id'=>$nft,'credit'=>$p['initial_credit'],'email_verification_bypassed'=>$withoutEmail&&!$u['email_verified_at']];
     }
     private function mint(int $actor,array $d): array { $this->admin($actor);$this->active();$id=self::id($d['user_id']??null);$this->user($id,true);if(mb_strlen(trim((string)($d['reason']??'')))<5) throw new Problem('Informe o motivo da emissão adicional.');return ['nft_id'=>$this->newNft($id,$actor,(string)($d['title']??''))]; }
     private function deposit(int $actor,array $d): array {
