@@ -21,17 +21,18 @@ final class Domain {
     private function notify(int $id,string $message): void { $this->db->run('INSERT INTO notifications(user_id,message,created_at) VALUES(?,?,?)',[$id,$message,$this->effective]); }
     public function operation(int $actor,string $action,array $data,string $key): array {
         if(!preg_match('/^[A-Za-z0-9_-]{16,80}$/D',$key)) throw new Problem('Chave de idempotência inválida.');
-        $hashData=$data;if($action==='nft.image')unset($hashData['image_path'],$hashData['thumbnail_path']);$hash=hash('sha256',self::canonical($hashData));
+        $hashData=$data;if(in_array($action,['nft.image','admin.nft.image_replace'],true))unset($hashData['image_path'],$hashData['thumbnail_path']);$hash=hash('sha256',self::canonical($hashData));
         return $this->db->transaction(function() use($actor,$action,$data,$key,$hash) {
             $gate=$this->db->row('SELECT * FROM economic_gate WHERE id=1 FOR UPDATE');
             $prior=$this->db->row('SELECT * FROM operations WHERE actor_id=? AND action=? AND idempotency_key=?',[$actor,$action,$key]);
             if($prior) { if(!hash_equals($prior['payload_hash'],$hash)) throw new Problem('Essa chave já foi usada com outras condições.',409,'idempotency_conflict'); return json_decode($prior['result'],true,512,JSON_THROW_ON_ERROR); }
             $this->effective=$this->db->now();
-            $this->periods->captureDue($this->effective,(int)$gate['sequence_no']);
+            // Troca de imagem é somente metadado: não captura cortes nem libera reservas.
+            if($action!=='admin.nft.image_replace') $this->periods->captureDue($this->effective,(int)$gate['sequence_no']);
             $this->db->run('UPDATE economic_gate SET sequence_no=sequence_no+1 WHERE id=1');
             $this->op=bin2hex(random_bytes(16));
             $this->db->run('INSERT INTO operations(id,actor_id,action,idempotency_key,payload_hash,effective_at,sequence_no) VALUES(?,?,?,?,?,?,?)',[$this->op,$actor,$action,$key,$hash,$this->effective,(int)$gate['sequence_no']+1]);
-            $this->expireActor($actor);
+            if($action!=='admin.nft.image_replace') $this->expireActor($actor);
             $result=match($action) {
                 'admin.activate'=>$this->activate($actor,$data), 'admin.parameters'=>$this->setParameters($actor,$data),
                 'admin.approve'=>$this->approveUser($actor,$data),
@@ -43,6 +44,7 @@ final class Domain {
                 'listing.create'=>$this->createListing($actor,$data), 'listing.cancel'=>$this->cancelListing($actor,$data),
                 'right.accept'=>$this->acceptRight($actor,$data), 'fee.pay'=>$this->payFee($actor,$data),
                 'nft.image'=>$this->associateImage($actor,$data),
+                'admin.nft.image_replace'=>$this->replaceNftImage($actor,$data),
                 default=>throw new Problem('Ação desconhecida.',404)
             };
             $result['operation_id']=$this->op;
@@ -220,6 +222,31 @@ final class Domain {
         $this->active();$this->user($actor,true);$n=$this->nft(self::id($d['nft_id']??null));if((int)$n['creator_id']!==$actor || $n['image_path']!==null) throw new Problem('Somente o criador pode concluir um único envio por NFT.',409);
         foreach(['image_path','thumbnail_path'] as $field) if(!preg_match('/^[a-f0-9]{32}(?:-thumb)?\.jpg$/D',$d[$field]??'') || !is_file($this->config['storage'].'/images/'.$d[$field])) throw new Problem('Imagem processada indisponível.',409);
         $this->db->run('UPDATE nfts SET image_path=?,thumbnail_path=?,image_sha=? WHERE id=?',[$d['image_path'],$d['thumbnail_path'],$d['image_sha'],$n['id']]);return ['nft_id'=>$n['id'],'image'=>'READY'];
+    }
+    private function replaceNftImage(int $actor,array $d): array {
+        $this->admin($actor);
+        $reason=$d['reason']??null;
+        if(!is_string($reason)||mb_strlen(trim($reason))<5||mb_strlen(trim($reason))>255||($d['confirm']??false)!==true)
+            throw new Problem('Confirme a troca e informe um motivo de 5 a 255 caracteres.');
+        $n=$this->nft(self::id($d['nft_id']??null));
+        if($n['reserved_proposal']!==null) throw new Problem('A NFT está reservada em uma proposta. Finalize a proposta antes de trocar a imagem.',409,'nft_reserved');
+        if(!is_string($d['expected_version']??null)||!hash_equals(NftImage::editVersion($n),$d['expected_version']))
+            throw new Problem('A NFT ou sua imagem mudou desde a consulta. Consulte novamente antes de trocar.',409,'image_version_conflict');
+        if(!is_string($d['image_sha']??null)||!preg_match('/^[a-f0-9]{64}$/D',$d['image_sha'])) throw new Problem('Hash de imagem inválido.');
+        $name=$d['image_path']??'';
+        if(!is_string($name)||!preg_match('/^[a-f0-9]{32}\.jpg$/D',$name)||($d['thumbnail_path']??'')!==substr($name,0,-4).'-thumb.jpg')
+            throw new Problem('Imagem processada inválida.');
+        foreach(['image_path','thumbnail_path'] as $field) {
+            $file=$this->config['storage'].'/images/'.$d[$field];
+            if(!is_file($file)||@getimagesize($file)===false||mime_content_type($file)!=='image/jpeg') throw new Problem('Imagem processada indisponível.',409);
+        }
+        if($d['image_path']===$n['image_path']) throw new Problem('A troca precisa de novos arquivos de imagem.',409);
+        $previous=NftImage::snapshot($n);
+        $this->db->run('UPDATE nfts SET image_path=?,thumbnail_path=?,image_sha=? WHERE id=?',[$d['image_path'],$d['thumbnail_path'],$d['image_sha'],$n['id']]);
+        $this->nftEvent($n,$actor,'IMAGE_REPLACED',$n['owner_id']===null?null:(int)$n['owner_id']);
+        $current=NftImage::snapshot(array_replace($n,array_intersect_key($d,array_flip(['image_path','thumbnail_path','image_sha']))));
+        return ['nft_id'=>$n['id'],'image'=>'READY','previous'=>$previous,'current'=>$current,
+            'creator_id'=>$n['creator_id'],'owner_id'=>$n['owner_id'],'state'=>$n['state']];
     }
     private function expireActor(int $actor): void {
         $ids=$this->db->all("SELECT p.id FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version WHERE p.state IN ('WAITING','PARTIAL') AND (p.buyer_id=? OR p.seller_id=?) AND v.expires_at<=? ORDER BY p.id LIMIT 100",[$actor,$actor,$this->effective]);
