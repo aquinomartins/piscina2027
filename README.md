@@ -80,6 +80,7 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [API](docs/API.md)
 - [Implantação](docs/DEPLOY_SUPERDOMINIOS.md)
 - [Carteiras e aprovação excepcional na Administração](docs/ADMIN_CARTEIRAS.md)
+- [Cadastro de turmas e correção de concorrência](docs/CADASTRO_TURMAS.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 

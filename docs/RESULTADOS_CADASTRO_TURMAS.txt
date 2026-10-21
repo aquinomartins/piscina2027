@@ -1,0 +1,96 @@
+CADASTRO DE TURMAS — VERIFICAÇÃO LOCAL
+Data: 2026-10-21T11:12:04-03:00
+Base: origin/main d997a01. PHP 8.3.35; MySQL 8.0.46; banco piscina_test em demo.
+Nenhum teste ou alteração foi executado na hospedagem pública. Nenhum SMTP foi enviado.
+
+SUÍTE ESPECÍFICA
+No syntax errors detected in app/Auth.php
+No syntax errors detected in config/example.php
+No syntax errors detected in tests/auth-limits.php
+No syntax errors detected in tests/auth-limit-worker.php
+PASS Janela fixa: dez tentativas; rejeição persistida sem ampliar validade
+PASS Contador saturado não estoura INT nem prolonga bloqueio
+PASS 32 chamadas na mesma chave (new): contagem exata e sem deadlock
+PASS 32 chamadas na mesma chave (existing): contagem exata e sem deadlock
+PASS 32 chamadas na mesma chave (expired): contagem exata e sem deadlock
+PASS Expiração reinicia em um; igualdade com horário atual também expira
+PASS Limites independentes por tipo e identidade
+PASS 25 cadastros simultâneos na mesma rede criam uma conta, token e outbox por aluno
+PASS Limite padrão da rede permite 50 e bloqueia a tentativa 51
+PASS Mesmo e-mail normalizado tem três tentativas, sem repetir token ou consumir global após bloqueio
+PASS 12 IPs simultâneos respeitam teto global configurado de seis
+PASS Teto global padrão continua bloqueando apesar de troca de IP e e-mail
+PASS Contadores legados preservam janela e não exigem limpeza ou migration
+PASS Configuração parcial mantém outros padrões e rejeitados por IP não gastam global
+PASS Duas inscrições do mesmo e-mail em paralelo: uma conta, um token e conflito 409
+PASS Formulários inválidos não geram conta, token ou contador de cadastro
+PASS Reenvio de token mantém quatro tentativas por origem e e-mail
+PASS Confirmação de senha mantém dez tentativas por usuário
+PASS Configuração insegura é recusada antes de criar contadores
+19 casos aprovados; 0 falhas.
+
+REGRESSÃO DAS REGRAS DO JOGO
+PASS Aprovação concorrente concede 160000 centavos e uma NFT
+PASS Depósito concorrente com mesma chave não duplica; conflito de conteúdo
+PASS Retirada pública em mR$, cotas independentes e redepósito
+PASS 10 BYC não retiram por 11; pagamento único em mR$
+PASS Retiradas concorrentes: somente vencedor paga
+PASS Venda de 3 BYC por mR$90 sem emissão; segunda aprovação única
+PASS Ciclo por BYC custa 1 BYC líquido e não destrói cota
+PASS Venda de NFT preserva criador, venda de cota não acompanha NFT
+PASS Contraproposta libera reservas e invalida versão anterior
+PASS Proposta não reserva patrimônio alheio; saldo reservado não pode gastar
+PASS Expiração na ação libera recursos, mesmo antes do cron
+PASS Cancelamento e segunda aprovação concorrentes têm um único desfecho
+PASS Revisão e aprovação concorrentes preservam versão e reservas
+PASS Dois gastos incompatíveis não criam saldo negativo
+PASS N4 Q10 q3: bruto 240, taxa 100, líquido 140; participante sem cotas
+PASS Venda depois do corte não transfere direito, cron atrasado usa snapshot
+PASS Maiores restos: 6667,6667,6666; soma conserva D
+PASS N=0 Q=0 e taxa com saldo insuficiente permanecem válidos
+PASS Parâmetros novos não reescrevem obrigações nem cotação anterior
+PASS Produção não presume política nem data inicial
+PASS Precisão decimal, escala mR$, limites e JSON strings
+PASS Autorização: cadastro pendente e ativos de terceiros não movimentam
+PASS Retomada de processamento em lotes não publica direitos parciais
+PASS Períodos atrasados preservam retratos ordenados distintos
+PASS Reconciliação detecta adulteração de saldo agregado
+PASS Transação atravessa corte: eficácia pelo gate e snapshot anterior à próxima alteração
+PASS Uploads concorrentes preservam direito único e mesma chave usa hash do conteúdo
+PASS Falha de imagem não consome envio; somente criador autorizado
+PASS Tokens de e-mail e recuperação expiram, uso único e senha revoga sessões
+PASS Anúncio não liquida nem reserva; cancelamento remove publicação
+PASS Preço zero ou fração com total zero mantém entrega e não cria pagamento fictício
+PASS Deadlock MySQL real faz rollback e tentativa limitada sem duplicar efeitos
+PASS Cron recupera calendário longo por lotes; operação não ultrapassa cortes pendentes
+PASS Gasto novo libera reserva vencida do autor antes de validar saldo
+PASS Aprovação sem e-mail exige admin, motivo e confirmação; não falsifica verificação
+PASS Aprovação excepcional concorrente concede uma única carteira e NFT
+PASS Aprovação excepcional respeita limites e rollback da concessão
+PASS Reaprovação de concessão anterior preserva gastos, cotas e NFT
+PASS Carteiras administrativas negam participantes e não vazam para perfil público
+PASS Busca administrativa literal e paginação alcançam todos os cadastros sem criar contas
+PASS Extrato administrativo paginado e custódia contam apenas o último depositante
+
+41 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.35
+
+INTEGRAÇÃO HTTP REAL
+PHP com oito workers configurados, OPcache, cota de uma CPU e 512 MiB; banco separado.
+Servidor local em 127.0.0.1, cookies e CSRF próprios de cada participante.
+PASS CSRF obrigatório e carteira privada antes de autenticar
+PASS Duas rajadas de 25 cadastros no mesmo IP: 50 respostas HTTP 200
+PASS Tentativas 51–55 bloqueadas; X-Forwarded-For não contorna a cota da rede
+PASS Login continua disponível após cota de cadastro; conta pendente sem verificação, créditos ou permissão de jogar
+PASS Rotação de CSRF, logout e proteção de sessão preservados
+PASS Login mantém dez tentativas por IP + e-mail, sem bloquear outra conta da turma
+PASS Recuperação mantém quatro tentativas por origem + e-mail
+P95 observado das 50 inscrições nas duas rajadas: 3372.2 ms.
+É um ensaio funcional local com banco fictício; não mede a capacidade do Plano Pro.
+Persistência: 50 usuários pendentes e não verificados, 50 tokens, 50 mensagens PENDING, sem tentativa de SMTP.
+Nenhuma conta contábil foi criada para esses participantes antes da aprovação.
+Nenhum HTTP 503, PDOException, aviso ou fatal PHP registrado no servidor HTTP do ensaio.
+
+ESCOPO
+Único arquivo de execução alterado: app/Auth.php.
+Configuração opcional documentada em config/example.php; limites de login, token e reautenticação preservados.
+Interface, service worker, movimentações do jogo, imagens e configuração privada não foram alterados.
