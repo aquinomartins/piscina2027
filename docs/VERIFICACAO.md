@@ -77,3 +77,17 @@ Validação local em PHP **8.3.35**, MySQL **8.0.46** e Chromium. Ambiente isola
 - Sintaxe dos PHP alterados e do fixture verificada; `node --check` e `git diff --check` aprovados.
 
 Nenhum reset ou migração SQL acompanha esta atualização. Alterações de produção devem seguir o [guia de atualização administrativa](ADMIN_CARTEIRAS.md). Testes não representam instalação física em Android/iOS nem validação do servidor da Superdomínios.
+
+## Troca administrativa de imagem da NFT
+
+Validação local com PHP **8.3.35**, MySQL **8.0.46** e Chromium, em demo e banco isolado `piscina_test`. Nenhum acesso à hospedagem, envio externo de e-mail ou troca de imagem de produção.
+
+- `php tests/run.php`: **49 cenários, zero falhas**, incluindo os 41 anteriores. Novos casos cobrem autorização, motivo/confirmação, versão da imagem e custódia, bloqueio de reserva, par JPEG válido, alteração somente de metadados, auditoria/proveniência, reexecução, concorrência com único vencedor, preservação de arquivos auditados pelo Cron e ausência de processamento econômico por troca de imagem.
+- `node tests/admin-image-browser.cjs`: **7 grupos aprovados** com API, PHP e MySQL reais. Confere acesso negado para anônimo/participante, CSRF, senha, motivo, confirmação, MIME, tamanho, erro sem perda da imagem anterior, upload por Admin que não é criador, identidade/custódia/saldos preservados, replay/conflito, auditoria sem senha e envio único do criador mantido.
+- PNG de **2400×1200** enviado pela interface; original servido em JPEG **1600×800** e miniatura em JPEG **480×240**. Versão nova presente nas URLs da Administração, mercado e detalhe público da NFT.
+- Resposta interrompida via CDP **depois de o servidor confirmar**: o frontend recupera o recibo administrativo real, sem reenviar ou duplicar o evento.
+- Painel conferido em **320, 390, 768 e 1440 px** sem transbordamento horizontal. Diálogo mobile e painel desktop inspecionados.
+- Regressão: **17 verificações** de `tests/browser.cjs`, **7 grupos** de `tests/admin-browser.cjs` e **6 grupos** de `tests/pwa-menu.cjs` aprovados. Cada suíte com banco real usa fixture demo nova. PWA usa service workers reais e API simulada na raiz e subpasta.
+- Sintaxe PHP/JS e diferenças de whitespace conferidas. O upload normal do criador não foi reescrito; `Upload::cleanup` somente reconhece as referências de versões mantidas pela auditoria administrativa.
+
+As telas públicas recebem apenas URLs de imagem versionadas e o rótulo do evento de proveniência. Cadastro, autenticação, negociação, depósito, retirada, direitos, taxas, configuração privada e esquema SQL mantêm seus fluxos. Implantação conforme [guia da troca de imagem](TROCAR_IMAGEM_ADMIN.md).
