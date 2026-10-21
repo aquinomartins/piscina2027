@@ -81,6 +81,7 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [Implantação](docs/DEPLOY_SUPERDOMINIOS.md)
 - [Carteiras e aprovação excepcional na Administração](docs/ADMIN_CARTEIRAS.md)
 - [Cadastro de turmas e correção de concorrência](docs/CADASTRO_TURMAS.md)
+- [Trocar imagem da NFT pela Administração](docs/TROCAR_IMAGEM_ADMIN.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 

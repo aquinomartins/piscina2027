@@ -34,6 +34,14 @@ final class Upload {
     public function cleanup(): int {
         $count=0;$dir=$this->config['storage'].'/images';if(!is_dir($dir)) return 0;
         $associated=[];foreach($this->domain->db->all('SELECT image_path,thumbnail_path FROM nfts WHERE image_path IS NOT NULL')as $r){$associated[$r['image_path']]=true;$associated[$r['thumbnail_path']]=true;}
+        // Versões trocadas pelo Admin são preservadas para a auditoria, não são órfãs.
+        foreach($this->domain->db->all("SELECT JSON_UNQUOTE(JSON_EXTRACT(data,'$.result.previous.image_path')) image_path,
+            JSON_UNQUOTE(JSON_EXTRACT(data,'$.result.previous.thumbnail_path')) thumbnail_path,
+            JSON_UNQUOTE(JSON_EXTRACT(data,'$.input.image_path')) new_image_path,
+            JSON_UNQUOTE(JSON_EXTRACT(data,'$.input.thumbnail_path')) new_thumbnail_path
+            FROM audit_events WHERE kind='admin.nft.image_replace'") as $r) {
+            foreach($r as $path)if(is_string($path)&&preg_match('/^[a-f0-9]{32}(?:-thumb)?\.jpg$/D',$path))$associated[$path]=true;
+        }
         foreach(glob($dir.'/*.jpg') as $file) {if(filemtime($file)>time()-86400) continue;$name=basename($file);if(!isset($associated[$name])) {unlink($file);$count++;}}
         return $count;
     }
