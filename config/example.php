@@ -8,6 +8,8 @@ return [
     'storage' => dirname(__DIR__) . '/storage',
     'session_path' => dirname(__DIR__) . '/storage/sessions',
     'secure_cookie' => true,
+    // Tentativas de cadastro em 15 minutos: turma no mesmo Wi-Fi + proteção de e-mail e do sistema.
+    'registration_limits' => ['per_ip' => 50, 'per_email' => 3, 'global' => 100],
     'smtp' => ['host' => '', 'port' => 587, 'username' => '', 'password' => '', 'encryption' => 'tls', 'from' => '', 'name' => 'Piscina de Liquidez'],
     'mail_transport' => 'smtp', // 'file' permitido somente em demo
     'max_users' => 500, 'max_nfts' => 5000, 'snapshot_periods_per_run' => 10, 'upload_bytes' => 5242880, 'upload_pixels' => 16000000,

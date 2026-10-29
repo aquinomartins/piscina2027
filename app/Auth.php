@@ -16,22 +16,47 @@ final class Auth {
     public function actor(): int {$this->session();if(empty($_SESSION['user_id'])) throw new Problem('Entre para continuar.',401,'unauthenticated');$u=$this->db->row('SELECT auth_version FROM users WHERE id=?',[$_SESSION['user_id']]);if(!$u||(int)$u['auth_version']!==($_SESSION['auth_version']??0)) {$this->logout();throw new Problem('Sessão encerrada. Entre novamente.',401);}return (int)$_SESSION['user_id'];}
     public function checkCsrf(?string $token): void {$this->session();if(!$token||!hash_equals($_SESSION['csrf'],$token)) throw new Problem('Sessão da página expirou. Atualize e tente novamente.',403,'csrf');}
     public function limit(string $kind,string $identity,int $max=10,int $seconds=900): void {
+        if($max<1||$max>1000000||$seconds<1||$seconds>86400) throw new \InvalidArgumentException('Limite de tentativas inválido.');
         $bucket=hash('sha256',$kind.':'.$identity);
         $allowed=$this->db->transaction(function() use($bucket,$max,$seconds){
-            $this->db->run('INSERT IGNORE INTO rate_limits(bucket,attempts,expires_at) VALUES(?,0,UTC_TIMESTAMP(6))',[$bucket]);
-            $r=$this->db->row('SELECT * FROM rate_limits WHERE bucket=? FOR UPDATE',[$bucket]);$n=$r['expires_at']<=$this->db->now()?1:(int)$r['attempts']+1;
-            $expires=$n===1?(new \DateTimeImmutable($this->db->now()))->modify("+$seconds seconds")->format('Y-m-d H:i:s.u'):$r['expires_at'];
-            $this->db->run('UPDATE rate_limits SET attempts=?,expires_at=? WHERE bucket=?',[$n,$expires,$bucket]);return $n<=$max;
+            // O upsert obtém bloqueio exclusivo diretamente, sem converter o
+            // bloqueio compartilhado de INSERT IGNORE em SELECT FOR UPDATE.
+            // A ordem das atribuições preserva a janela antiga ao contar.
+            $this->db->run('INSERT INTO rate_limits(bucket,attempts,expires_at) VALUES(?,1,DATE_ADD(UTC_TIMESTAMP(6),INTERVAL ? SECOND))
+                ON DUPLICATE KEY UPDATE
+                attempts=IF(expires_at<=UTC_TIMESTAMP(6),1,LEAST(attempts+1,?)),
+                expires_at=IF(expires_at<=UTC_TIMESTAMP(6),DATE_ADD(UTC_TIMESTAMP(6),INTERVAL ? SECOND),expires_at)',[$bucket,$seconds,$max+1,$seconds]);
+            // A transação ainda detém o bloqueio da escrita: cada chamada lê
+            // sua própria contagem, inclusive quando precisa responder 429.
+            return (int)$this->db->row('SELECT attempts FROM rate_limits WHERE bucket=?',[$bucket])['attempts']<=$max;
         });if(!$allowed) throw new Problem('Muitas tentativas. Aguarde alguns minutos.',429,'rate_limit');
+    }
+    private function registrationLimits(): array {
+        $configured=$this->config['registration_limits']??[];
+        if(!is_array($configured)) throw new \RuntimeException('Configuração de limites de cadastro inválida.');
+        $limits=[];
+        foreach(['per_ip'=>[50,500],'per_email'=>[3,10],'global'=>[100,1000]] as $key=>[$default,$maximum]) {
+            $value=$configured[$key]??$default;
+            if(!is_int($value)||$value<1||$value>$maximum) throw new \RuntimeException('Limite de cadastro inválido: '.$key);
+            $limits[$key]=$value;
+        }
+        return $limits;
     }
     public function register(array $d): array {
         $email=mb_strtolower(trim((string)($d['email']??'')));$name=trim((string)($d['display_name']??''));$password=(string)($d['password']??'');
         if(!filter_var($email,FILTER_VALIDATE_EMAIL)||strlen($email)>190) throw new Problem('E-mail inválido.');
         if(mb_strlen($name)<2||mb_strlen($name)>80) throw new Problem('Identificação pública entre 2 e 80 caracteres.');$this->password($password);
-        $this->limit('register',$_SERVER['REMOTE_ADDR']??'cli',5);
+        $limits=$this->registrationLimits();
+        // Bloqueios de origem/e-mail não gastam a cota global. A origem é
+        // limitada antes de criar contadores de novos endereços de e-mail.
+        $this->limit('register',$_SERVER['REMOTE_ADDR']??'cli',$limits['per_ip']);
+        $this->limit('register.email',$email,$limits['per_email']);
+        $this->limit('register.global','all',$limits['global']);
         return $this->db->transaction(function() use($email,$name,$password){
             if($this->db->row('SELECT id FROM users WHERE email=?',[$email])) throw new Problem('Não foi possível cadastrar esse e-mail.',409);
-            $this->db->run('INSERT INTO users(email,password_hash,display_name,created_at) VALUES(?,?,?,UTC_TIMESTAMP(6))',[$email,password_hash($password,PASSWORD_DEFAULT),$name]);$id=(int)$this->db->pdo->lastInsertId();$this->token($id,'verify');return ['user_id'=>(string)$id,'message'=>'Cadastro criado. Verifique seu e-mail para solicitar aprovação.'];
+            try {$this->db->run('INSERT INTO users(email,password_hash,display_name,created_at) VALUES(?,?,?,UTC_TIMESTAMP(6))',[$email,password_hash($password,PASSWORD_DEFAULT),$name]);}
+            catch(\PDOException $e) {if((int)($e->errorInfo[1]??0)===1062) throw new Problem('Não foi possível cadastrar esse e-mail.',409);throw $e;}
+            $id=(int)$this->db->pdo->lastInsertId();$this->token($id,'verify');return ['user_id'=>(string)$id,'message'=>'Cadastro criado. Verifique seu e-mail para solicitar aprovação.'];
         });
     }
     private function password(string $p): void {if(strlen($p)<12||strlen($p)>72) throw new Problem('Senha deve ter entre 12 e 72 bytes.');}
