@@ -254,4 +254,5 @@ test('Troca em NFT na piscina não altera economia nem captura calendário atras
  assertSame(json_encode($balances),json_encode(service()->ledger->balances($u)));
  assertSame(0,db()->row('SELECT COUNT(*) n FROM periods')['n']);
 });
+require __DIR__.'/danger-domain.php';
 echo "\n$tests cenários, $failed falhas. MySQL ".db()->row('SELECT VERSION() v')['v'].', PHP '.PHP_VERSION."\n";exit($failed?1:0);

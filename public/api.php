@@ -17,6 +17,8 @@ try {
             'admin.wallet'=>$queries->adminWallet($auth->actor(),$_GET),
             'admin.nft'=>$queries->adminNft($auth->actor(),$_GET),
             'admin.nft.image_result'=>$queries->adminImageResult($auth->actor(),$_GET),
+            'admin.danger'=>(new Piscina\AdminDanger($domain))->view($auth->actor(),Piscina\Domain::id($_GET['user_id']??null),(int)($_GET['offset']??0)),
+            'admin.danger.result'=>(function()use($auth,$domain,$queries){$actor=$auth->actor();$domain->admin($actor);$a=$_GET['operation_action']??'';if(!in_array($a,['admin.danger.fine','admin.danger.ban','admin.danger.unban','admin.danger.delete','admin.danger.password'],true))throw new Piscina\Problem('Ação indisponível.',404);return $queries->operation($actor,['action'=>$a,'key'=>$_GET['key']??'']);})(),
             default=>throw new Piscina\Problem('Endpoint desconhecido.',404)
         };
     } elseif($method==='POST') {
@@ -28,6 +30,7 @@ try {
             'auth.register'=>$auth->register($data),'auth.login'=>$auth->login($data),'auth.logout'=>$auth->logout(),
             'auth.request_verify'=>$auth->requestToken($data,'verify'),'auth.request_reset'=>$auth->requestToken($data,'reset'),
             'auth.verify'=>$auth->useToken($data,'verify'),'auth.reset'=>$auth->useToken($data,'reset'),
+            'admin.danger.password'=>(function()use($auth,$domain,$data){$actor=$auth->actor();$domain->admin($actor);$auth->reauthenticate($actor,(string)($data['password']??''));session_write_close();return (new Piscina\AdminCredentials($domain))->reset($actor,$data,$_SERVER['HTTP_IDEMPOTENCY_KEY']??'');})(),
             'nft.upload'=>(new Piscina\Upload($domain,$config))->save($auth->actor(),Piscina\Domain::id($data['nft_id']??null),$_FILES['image']??[],$_SERVER['HTTP_IDEMPOTENCY_KEY']??''),
             'admin.nft.image_upload'=>(function()use($auth,$domain,$config,$data){
                 $actor=$auth->actor();$domain->admin($actor);$auth->reauthenticate($actor,(string)($data['password']??''));

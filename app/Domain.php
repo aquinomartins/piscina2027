@@ -7,9 +7,10 @@ final class Domain {
     private string $op = '';
     private string $effective = '';
     public function __construct(public Database $db, public array $config) { $this->ledger=new Ledger($db); $this->periods=new Periods($db,$this->ledger,$config); }
-    public function user(int $id, bool $approved = false): array {
+    public function user(int $id, bool $approved = false,bool $allowRestricted=false): array {
         $u=$this->db->row('SELECT id,email,display_name,role,status,email_verified_at,approved_at FROM users WHERE id=?',[$id]);
         if (!$u) throw new Problem('Participante não encontrado.',404);
+        if(!$allowRestricted) Restrictions::check($this->db,$id);
         if ($approved && $u['status']!=='approved') throw new Problem('Seu cadastro precisa ser aprovado para operar.',403);
         return $u;
     }
@@ -20,10 +21,15 @@ final class Domain {
     private function audit(int $actor,string $kind,array $data): void { $this->db->run('INSERT INTO audit_events(actor_id,operation_id,kind,data,created_at) VALUES(?,?,?,?,?)',[$actor,$this->op,$kind,json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$this->effective]); }
     private function notify(int $id,string $message): void { $this->db->run('INSERT INTO notifications(user_id,message,created_at) VALUES(?,?,?)',[$id,$message,$this->effective]); }
     public function operation(int $actor,string $action,array $data,string $key): array {
+        if(str_starts_with($action,'admin.danger.')) {
+            if(!in_array($action,['admin.danger.fine','admin.danger.ban','admin.danger.unban','admin.danger.delete'],true))throw new Problem('Ação indisponível.',404);
+            if(array_diff(array_keys($data),['user_id','reason','confirm','amount','until','confirmation']))throw new Problem('Campos não permitidos.');
+        }
         if(!preg_match('/^[A-Za-z0-9_-]{16,80}$/D',$key)) throw new Problem('Chave de idempotência inválida.');
         $hashData=$data;if(in_array($action,['nft.image','admin.nft.image_replace'],true))unset($hashData['image_path'],$hashData['thumbnail_path']);$hash=hash('sha256',self::canonical($hashData));
         return $this->db->transaction(function() use($actor,$action,$data,$key,$hash) {
             $gate=$this->db->row('SELECT * FROM economic_gate WHERE id=1 FOR UPDATE');
+            Restrictions::check($this->db,$actor);
             $prior=$this->db->row('SELECT * FROM operations WHERE actor_id=? AND action=? AND idempotency_key=?',[$actor,$action,$key]);
             if($prior) { if(!hash_equals($prior['payload_hash'],$hash)) throw new Problem('Essa chave já foi usada com outras condições.',409,'idempotency_conflict'); return json_decode($prior['result'],true,512,JSON_THROW_ON_ERROR); }
             $this->effective=$this->db->now();
@@ -45,6 +51,7 @@ final class Domain {
                 'right.accept'=>$this->acceptRight($actor,$data), 'fee.pay'=>$this->payFee($actor,$data),
                 'nft.image'=>$this->associateImage($actor,$data),
                 'admin.nft.image_replace'=>$this->replaceNftImage($actor,$data),
+                'admin.danger.fine','admin.danger.ban','admin.danger.unban','admin.danger.delete'=>(new AdminDanger($this,$this->op,$this->effective))->apply($actor,$action,$data),
                 default=>throw new Problem('Ação desconhecida.',404)
             };
             $result['operation_id']=$this->op;
@@ -54,6 +61,15 @@ final class Domain {
         });
     }
     public static function canonical(array $data): string { ksort($data); foreach($data as &$v) if(is_array($v)) $v=json_decode(self::canonical($v),true); return json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR); }
+    public function cancelForRestriction(int $actor,int $target): array {
+        $this->admin($actor);
+        if(!$this->db->pdo->inTransaction()||$this->op==='')throw new \LogicException('Cancelamento exige operação transacional.');
+        $proposals=$this->db->all("SELECT id FROM proposals WHERE (buyer_id=? OR seller_id=?) AND state IN ('WAITING','PARTIAL') ORDER BY id",[$target,$target]);
+        $listings=$this->db->all("SELECT id FROM listings WHERE state='ACTIVE' AND (user_id=? OR nft_id IN (SELECT id FROM nfts WHERE owner_id=?))",[$target,$target]);
+        foreach($proposals as $r)$this->release($this->proposal((int)$r['id']),'CANCELLED');
+        $this->db->run("UPDATE listings SET state='CANCELLED' WHERE state='ACTIVE' AND (user_id=? OR nft_id IN (SELECT id FROM nfts WHERE owner_id=?))",[$target,$target]);
+        return ['cancelled_proposals'=>array_column($proposals,'id'),'cancelled_listings'=>array_column($listings,'id')];
+    }
     private function activate(int $actor,array $d): array {
         $this->admin($actor);
         if(($d['confirm']??false)!==true || ($d['rounding']??'')!=='HALF_UP_CENT') throw new Problem('Revise e confirme as decisões e o arredondamento.');
@@ -96,12 +112,12 @@ final class Domain {
         if(!$u['email_verified_at'] && !$withoutEmail) throw new Problem('O e-mail precisa ser verificado antes da aprovação.',409);
         if($this->db->row('SELECT user_id FROM initial_grants WHERE user_id=?',[$id])) {
             if($u['status']!=='approved') {
-                if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved'")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
+                if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved' AND NOT EXISTS (SELECT 1 FROM admin_restrictions ar WHERE ar.user_id=users.id AND ar.deleted_at IS NOT NULL)")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
                 $this->db->run("UPDATE users SET status='approved',approved_at=? WHERE id=?",[$this->effective,$id]);
             }
             return ['user_id'=>(string)$id,'already_granted'=>true,'email_verification_bypassed'=>$withoutEmail&&!$u['email_verified_at']];
         }
-        if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved'")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
+        if((int)$this->db->row("SELECT COUNT(*) n FROM users WHERE status='approved' AND NOT EXISTS (SELECT 1 FROM admin_restrictions ar WHERE ar.user_id=users.id AND ar.deleted_at IS NOT NULL)")['n'] >= ($this->config['max_users']??500)) throw new Problem('Limite operacional de participantes atingido.',409);
         $p=$this->parameters();
         $this->db->run("UPDATE users SET status='approved',approved_at=? WHERE id=?",[$this->effective,$id]);
         $this->db->run('INSERT INTO initial_grants(user_id,parameter_id,operation_id) VALUES(?,?,?)',[$id,$p['id'],$this->op]);

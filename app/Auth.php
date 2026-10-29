@@ -13,7 +13,7 @@ final class Auth {
         $_SESSION['last_seen']=time();
     }
     public function csrf(): string {$this->session();return $_SESSION['csrf'];}
-    public function actor(): int {$this->session();if(empty($_SESSION['user_id'])) throw new Problem('Entre para continuar.',401,'unauthenticated');$u=$this->db->row('SELECT auth_version FROM users WHERE id=?',[$_SESSION['user_id']]);if(!$u||(int)$u['auth_version']!==($_SESSION['auth_version']??0)) {$this->logout();throw new Problem('Sessão encerrada. Entre novamente.',401);}return (int)$_SESSION['user_id'];}
+    public function actor(): int {$this->session();if(empty($_SESSION['user_id'])) throw new Problem('Entre para continuar.',401,'unauthenticated');$u=$this->db->row('SELECT auth_version FROM users WHERE id=?',[$_SESSION['user_id']]);if(!$u||(int)$u['auth_version']!==($_SESSION['auth_version']??0)) {$this->logout();throw new Problem('Sessão encerrada. Entre novamente.',401);}Restrictions::check($this->db,(int)$_SESSION['user_id']);return (int)$_SESSION['user_id'];}
     public function checkCsrf(?string $token): void {$this->session();if(!$token||!hash_equals($_SESSION['csrf'],$token)) throw new Problem('Sessão da página expirou. Atualize e tente novamente.',403,'csrf');}
     public function limit(string $kind,string $identity,int $max=10,int $seconds=900): void {
         if($max<1||$max>1000000||$seconds<1||$seconds>86400) throw new \InvalidArgumentException('Limite de tentativas inválido.');
@@ -65,9 +65,16 @@ final class Auth {
         $u=$this->db->row('SELECT * FROM users WHERE email=?',[$email]);
         $hash=$u['password_hash']??'$2y$10$5pgmi6DdRFXLFVoMVHLBeujbaJ6ri/BGLNpGwNUPlNUYaiojaNCGO';
         if(!password_verify((string)($d['password']??''),$hash)||!$u) throw new Problem('E-mail ou senha incorretos.',401);
-        $this->session();session_regenerate_id(true);$_SESSION['user_id']=(int)$u['id'];$_SESSION['auth_version']=(int)$u['auth_version'];$_SESSION['csrf']=bin2hex(random_bytes(32));$_SESSION['last_seen']=time();
-        if(password_needs_rehash($u['password_hash'],PASSWORD_DEFAULT)) $this->db->run('UPDATE users SET password_hash=? WHERE id=?',[password_hash($d['password'],PASSWORD_DEFAULT),$u['id']]);
-        return ['user'=>['id'=>$u['id'],'display_name'=>$u['display_name'],'status'=>$u['status'],'role'=>$u['role']],'csrf'=>$_SESSION['csrf']];
+        $rehash=password_needs_rehash($u['password_hash'],PASSWORD_DEFAULT)?password_hash($d['password'],PASSWORD_DEFAULT):null;
+        return $this->db->transaction(function()use($u,$rehash){
+            $this->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
+            $fresh=$this->db->row('SELECT * FROM users WHERE id=?',[$u['id']]);
+            if(!$fresh||!hash_equals($u['password_hash'],$fresh['password_hash']))throw new Problem('Credenciais alteradas. Entre novamente.',401);
+            Restrictions::check($this->db,(int)$u['id']);
+            if($rehash)$this->db->run('UPDATE users SET password_hash=? WHERE id=?',[$rehash,$u['id']]);
+            $this->session();session_regenerate_id(true);$_SESSION['user_id']=(int)$u['id'];$_SESSION['auth_version']=(int)$fresh['auth_version'];$_SESSION['csrf']=bin2hex(random_bytes(32));$_SESSION['last_seen']=time();
+            return ['user'=>['id'=>$u['id'],'display_name'=>$u['display_name'],'status'=>$u['status'],'role'=>$u['role']],'csrf'=>$_SESSION['csrf']];
+        });
     }
     public function logout(): array {
         $this->session();$_SESSION=[];session_regenerate_id(true);$_SESSION['csrf']=bin2hex(random_bytes(32));$_SESSION['last_seen']=time();return ['csrf'=>$_SESSION['csrf'],'logged_out'=>true];
@@ -75,7 +82,7 @@ final class Auth {
     public function reauthenticate(int $actor,string $password): void {$this->limit('reauth',(string)$actor,10);$u=$this->db->row('SELECT password_hash FROM users WHERE id=?',[$actor]);if(!$u||!password_verify($password,$u['password_hash'])) throw new Problem('Confirme sua senha atual.',403);}
     public function requestToken(array $d,string $kind): array {
         $email=mb_strtolower(trim((string)($d['email']??'')));$this->limit('token',($_SERVER['REMOTE_ADDR']??'cli').':'.$email,4);
-        $this->db->transaction(function() use($email,$kind){$u=$this->db->row('SELECT id,email_verified_at FROM users WHERE email=?',[$email]);if($u&&($kind!=='verify'||!$u['email_verified_at'])) $this->token((int)$u['id'],$kind);});
+        $this->db->transaction(function() use($email,$kind){$this->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');$u=$this->db->row('SELECT u.id,u.email_verified_at FROM users u LEFT JOIN admin_restrictions r ON r.user_id=u.id WHERE u.email=? AND r.deleted_at IS NULL',[$email]);if($u&&($kind!=='verify'||!$u['email_verified_at'])) $this->token((int)$u['id'],$kind);});
         return ['message'=>'Se o endereço for elegível, enviaremos as instruções.'];
     }
     private function token(int $id,string $kind): void {
@@ -89,8 +96,10 @@ final class Auth {
         $token=(string)($d['token']??'');if(!preg_match('/^[a-f0-9]{64}$/D',$token)) throw new Problem('Link inválido ou expirado.');
         $password=(string)($d['password']??'');if($kind==='reset') $this->password($password);
         return $this->db->transaction(function() use($token,$kind,$password){
+            $this->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
             $t=$this->db->row('SELECT * FROM auth_tokens WHERE token_hash=? AND kind=? FOR UPDATE',[hash('sha256',$token),$kind]);
             if(!$t||$t['used_at']||$t['expires_at']<=$this->db->now()) throw new Problem('Link inválido, usado ou expirado.');
+            if($this->db->row('SELECT user_id FROM admin_restrictions WHERE user_id=? AND deleted_at IS NOT NULL',[$t['user_id']]))throw new Problem('Link inválido, usado ou expirado.');
             $this->db->run('UPDATE auth_tokens SET used_at=UTC_TIMESTAMP(6) WHERE id=?',[$t['id']]);
             if($kind==='verify') $this->db->run('UPDATE users SET email_verified_at=COALESCE(email_verified_at,UTC_TIMESTAMP(6)) WHERE id=?',[$t['user_id']]);
             else { $this->db->run('UPDATE users SET password_hash=?,auth_version=auth_version+1 WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),$t['user_id']]);$this->db->run("UPDATE auth_tokens SET used_at=UTC_TIMESTAMP(6) WHERE user_id=? AND kind='reset' AND used_at IS NULL",[$t['user_id']]); }

@@ -13,6 +13,8 @@ FILES = (
 
 
 def main():
+    if (ROOT / 'app/AdminDanger.php').exists():
+        raise SystemExit('Use tools/build-danger-update.py: o pacote isolado de imagem não contém as novas dependências.')
     payload = {name: (ROOT / name).read_bytes() for name in FILES}
     payload['SHA256SUMS.txt'] = ''.join(
         f'{hashlib.sha256(data).hexdigest()}  {name}\n'

@@ -9,22 +9,23 @@ final class Queries {
         $state=($d['state']??'')==='POOL'?"n.state='POOL'":"(n.state='POOL' OR EXISTS (SELECT 1 FROM listings l WHERE l.nft_id=n.id AND l.state='ACTIVE' AND l.expires_at>UTC_TIMESTAMP(6)))";
         $nfts=$db->all("SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,n.image_path IS NOT NULL image_ready,".NftImage::SQL_VERSION." image_version,n.reserved_proposal IS NOT NULL reserved,u.display_name creator_name,o.display_name owner_name FROM nfts n JOIN users u ON u.id=n.creator_id LEFT JOIN users o ON o.id=n.owner_id WHERE $state AND (n.title LIKE ? OR u.display_name LIKE ?) ORDER BY n.id DESC LIMIT $limit OFFSET $off",[$like,$like]);
         $listings=$db->all("SELECT l.*,u.display_name,n.title nft_title FROM listings l JOIN users u ON u.id=l.user_id LEFT JOIN nfts n ON n.id=l.nft_id WHERE l.state='ACTIVE' AND l.expires_at>UTC_TIMESTAMP(6) AND (u.display_name LIKE ? OR l.asset LIKE ?) AND (l.asset<>'NFT' OR (n.state='PRIVATE' AND (l.side='BUY' OR n.owner_id=l.user_id))) ORDER BY l.id DESC LIMIT $limit OFFSET $off",[$like,$like]);
-        $users=$q!==''?$db->all("SELECT id,display_name FROM users WHERE status='approved' AND display_name LIKE ? ORDER BY id LIMIT 24",[$like]):[];
-        $stats=$db->row("SELECT (SELECT COUNT(*) FROM nfts WHERE state='POOL') pool_nfts,(SELECT COALESCE(SUM(balance),0) FROM accounts WHERE asset='SHARE' AND user_id IS NOT NULL) shares,(SELECT COUNT(*) FROM users WHERE status='approved') participants,(SELECT COUNT(*) FROM settlements) trades");
+        $users=$q!==''?$db->all("SELECT id,display_name FROM users WHERE status='approved' AND NOT EXISTS (SELECT 1 FROM admin_restrictions ar WHERE ar.user_id=users.id AND ar.deleted_at IS NOT NULL) AND display_name LIKE ? ORDER BY id LIMIT 24",[$like]):[];
+        $stats=$db->row("SELECT (SELECT COUNT(*) FROM nfts WHERE state='POOL') pool_nfts,(SELECT COALESCE(SUM(balance),0) FROM accounts WHERE asset='SHARE' AND user_id IS NOT NULL) shares,(SELECT COUNT(*) FROM users WHERE status='approved' AND NOT EXISTS (SELECT 1 FROM admin_restrictions ar WHERE ar.user_id=users.id AND ar.deleted_at IS NOT NULL)) participants,(SELECT COUNT(*) FROM settlements) trades");
         $feed=[];if($this->domain->policy()['public_feed']??false) $feed=$db->all("SELECT p.id,p.buyer_id,p.seller_id,p.settled_at,v.asset,v.quantity,v.total,b.display_name buyer_name,s.display_name seller_name FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version JOIN users b ON b.id=p.buyer_id JOIN users s ON s.id=p.seller_id WHERE p.state='SETTLED' ORDER BY p.id DESC LIMIT 20");
         return compact('nfts','listings','users','stats','feed')+['offset'=>(string)$off,'has_more'=>count($nfts)===$limit||count($listings)===$limit,'parameters'=>$this->domain->parameters(),'active'=>$this->domain->policy()!==null];
     }
-    public function nft(int $id): array {
+    public function nft(int $id,bool $admin=false): array {
         $db=$this->domain->db;$n=$db->row('SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,n.image_path IS NOT NULL image_ready,'.NftImage::SQL_VERSION.' image_version,n.reserved_proposal IS NOT NULL reserved,u.display_name creator_name,o.display_name owner_name FROM nfts n JOIN users u ON u.id=n.creator_id LEFT JOIN users o ON o.id=n.owner_id WHERE n.id=?',[$id])??throw new Problem('NFT não encontrada.',404);
+        if($n['state']==='CUSTODY'&&!$admin)throw new Problem('NFT não encontrada.',404);
         $n['events']=$db->all('SELECT e.kind,e.effective_at,e.from_user,e.to_user,u.display_name actor_name FROM nft_events e JOIN users u ON u.id=e.actor_id WHERE nft_id=? ORDER BY e.id DESC LIMIT 50',[$id]);return $n;
     }
     public function profile(int $id): array {
-        $db=$this->domain->db;$u=$db->row("SELECT id,display_name,created_at FROM users WHERE id=? AND status='approved'",[$id])??throw new Problem('Perfil indisponível.',404);
+        $db=$this->domain->db;$u=$db->row("SELECT id,display_name,created_at FROM users WHERE id=? AND status='approved' AND NOT EXISTS (SELECT 1 FROM admin_restrictions ar WHERE ar.user_id=users.id AND ar.deleted_at IS NOT NULL)",[$id])??throw new Problem('Perfil indisponível.',404);
         $u['listings']=$db->all("SELECT l.*,n.title nft_title FROM listings l LEFT JOIN nfts n ON n.id=l.nft_id WHERE l.user_id=? AND l.state='ACTIVE' AND l.expires_at>UTC_TIMESTAMP(6) ORDER BY l.id DESC LIMIT 24",[$id]);return $u;
     }
     public function dashboard(int $actor,array $d=[]): array {
         $db=$this->domain->db;$u=$this->domain->user($actor);[$off,$limit]=$this->paging($d);
-        $nfts=$db->all('SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,n.image_path IS NOT NULL image_ready,'.NftImage::SQL_VERSION.' image_version,n.reserved_proposal IS NOT NULL reserved FROM nfts n WHERE owner_id=? OR (creator_id=? AND image_path IS NULL) ORDER BY n.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
+        $nfts=$db->all('SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,n.image_path IS NOT NULL image_ready,'.NftImage::SQL_VERSION.' image_version,n.reserved_proposal IS NOT NULL reserved FROM nfts n WHERE state<>\'CUSTODY\' AND (owner_id=? OR (creator_id=? AND image_path IS NULL)) ORDER BY n.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
         $proposals=$db->all('SELECT p.*,v.asset,v.nft_id,v.quantity,v.unit_price,v.total,v.expires_at,b.display_name buyer_name,s.display_name seller_name FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version JOIN users b ON b.id=p.buyer_id JOIN users s ON s.id=p.seller_id WHERE p.buyer_id=? OR p.seller_id=? ORDER BY p.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
         $ids=array_column($proposals,'id');$approvals=$ids?$db->all('SELECT a.* FROM approvals a JOIN proposals p ON p.id=a.proposal_id WHERE p.id IN ('.implode(',',array_fill(0,count($ids),'?')).') AND a.version=p.current_version',$ids):[];
         $rights=$db->all("SELECT r.*,p.cutoff_at,p.nft_count,p.total_shares,p.distribution_total,p.parameter_id,s.shares,par.distribution_base FROM rights r JOIN periods p ON p.id=r.period_id JOIN period_snapshots s ON s.period_id=r.period_id AND s.user_id=r.user_id JOIN parameter_versions par ON par.id=p.parameter_id WHERE r.user_id=? AND p.state='PUBLISHED' ORDER BY r.id DESC LIMIT 24 OFFSET $off",[$actor]);
@@ -57,7 +58,7 @@ final class Queries {
         $wallets=$db->transaction(function()use($db,$where,$args,$limit,$off){
             $db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
             $total=$db->row("SELECT COUNT(*) n FROM users WHERE $where",$args)['n'];
-            $users=$db->all("SELECT id,email,display_name,role,status,email_verified_at,approved_at FROM users WHERE $where ORDER BY id DESC LIMIT $limit OFFSET $off",$args);
+            $users=$db->all("SELECT id,email,display_name,role,status,email_verified_at,approved_at,(SELECT r.deleted_at FROM admin_restrictions r WHERE r.user_id=users.id) deleted_at,(SELECT r.banned_until FROM admin_restrictions r WHERE r.user_id=users.id) banned_until FROM users WHERE $where ORDER BY id DESC LIMIT $limit OFFSET $off",$args);
             foreach($users as &$u) {
                 $u['balances']=$this->domain->ledger->balances((int)$u['id']);
                 $u['custody']=$this->adminCustody((int)$u['id']);
@@ -84,7 +85,7 @@ final class Queries {
         $this->domain->admin($actor);$user=Domain::id($d['user_id']??null);[$off,$limit]=$this->paging($d);$db=$this->domain->db;
         return $db->transaction(function()use($db,$user,$off,$limit){
             $db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
-            $u=$this->domain->user($user);
+            $u=$this->domain->user($user,false,true);
             $history=$db->all("SELECT e.id entry_id,t.id transaction_id,t.kind,t.created_at,t.operation_id,a.asset,a.purpose,e.amount
                 FROM ledger_entries e JOIN ledger_transactions t ON t.id=e.transaction_id
                 JOIN accounts a ON a.id=e.account_id WHERE a.user_id=?
@@ -99,7 +100,7 @@ final class Queries {
         $id=Domain::id($d['nft_id']??null);$db=$this->domain->db;
         return $db->transaction(function()use($db,$id){
             $db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');
-            $n=$this->nft($id);$raw=$db->row('SELECT * FROM nfts WHERE id=?',[$id]);
+            $n=$this->nft($id,true);$raw=$db->row('SELECT * FROM nfts WHERE id=?',[$id]);
             return $n+['edit_version'=>NftImage::editVersion($raw)];
         });
     }
