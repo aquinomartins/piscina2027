@@ -1,6 +1,6 @@
-const CACHE='piscina-static-v4';
+const CACHE='piscina-static-v6';
 const ROOT=new URL('./',self.location.href);
-const ASSETS=['assets/app.css','assets/app.js','assets/inter-latin.woff2','assets/placeholder.svg','icons/icon.svg','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','offline.html'].map(p=>new URL(p,ROOT).href);
+const ASSETS=['assets/app.css','assets/app.js','assets/admin-danger.js','assets/inter-latin.woff2','assets/placeholder.svg','icons/icon.svg','icons/icon-192.png','icons/icon-512.png','icons/maskable-512.png','offline.html'].map(p=>new URL(p,ROOT).href);
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('message',e=>{if(e.data?.type==='ACTIVATE')self.skipWaiting();});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('piscina-static-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
