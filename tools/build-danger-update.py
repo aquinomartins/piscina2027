@@ -10,8 +10,14 @@ RUNTIME = (
     'app/Upload.php', 'app/AdminImageUpload.php', 'app/NftImage.php',
     'public/api.php', 'public/image.php', 'public/assets/app.js',
     'public/assets/admin-danger.js', 'public/assets/app.css', 'public/sw.js',
+    'public/index.php', 'public/assets/home-hero.css',
+    'public/assets/piscina-home-1280.webp', 'public/assets/piscina-home-2125.webp',
 )
-FILES = RUNTIME + ('database/migrations/003_admin_danger.sql', 'docs/DANGER_ZONE.md', 'docs/RESULTADOS_DANGER_ZONE.txt')
+FILES = RUNTIME + (
+    'database/migrations/003_admin_danger.sql', 'docs/DANGER_ZONE.md',
+    'docs/RESULTADOS_DANGER_ZONE.txt', 'docs/HOME_ILUSTRADA.md',
+    'docs/images/home-desktop.webp', 'docs/images/home-mobile.webp',
+)
 
 
 def main():
