@@ -174,4 +174,85 @@ test('Extrato administrativo paginado e custódia contam apenas o último deposi
  assertSame('1',$q->adminWallet(1,['user_id'=>(string)$b])['custody']['pool_deposits']);
  fail(fn()=>$q->adminWallet(1,['user_id'=>'999999']),404);
 });
+function adminImageData(int $nft,?string $version=null): array {
+ $n=db()->row('SELECT * FROM nfts WHERE id=?',[$nft]);$dir=config()['storage'].'/images';if(!is_dir($dir))mkdir($dir,0700,true);
+ $name=bin2hex(random_bytes(16));$im=imagecreatetruecolor(12,10);imagefill($im,0,0,imagecolorallocate($im,80,150,100));
+ imagejpeg($im,$dir.'/'.$name.'.jpg');imagejpeg($im,$dir.'/'.$name.'-thumb.jpg');imagedestroy($im);
+ return ['nft_id'=>(string)$nft,'confirm'=>true,'reason'=>'Correção administrativa da imagem da obra',
+  'expected_version'=>$version??Piscina\NftImage::editVersion($n),'image_path'=>$name.'.jpg','thumbnail_path'=>$name.'-thumb.jpg',
+  'image_sha'=>hash_file('sha256',$dir.'/'.$name.'.jpg')];
+}
+test('Troca administrativa substitui somente imagem/miniatura, com auditoria e proveniência',function(){
+ [$u,$n]=user('Ana');$original=adminImageData($n);op($u,'nft.image',$original);
+ $before=db()->row('SELECT * FROM nfts WHERE id=?',[$n]);$balances=service()->ledger->balances($u);$entries=db()->row('SELECT COUNT(*) n FROM ledger_entries')['n'];
+ $data=adminImageData($n);$r=op(1,'admin.nft.image_replace',$data);
+ $after=db()->row('SELECT * FROM nfts WHERE id=?',[$n]);
+ foreach(['id','creator_id','owner_id','title','state','reserved_proposal','created_at'] as $key)assertSame($before[$key],$after[$key],$key);
+ assertSame($data['image_path'],$after['image_path']);assertSame($data['thumbnail_path'],$after['thumbnail_path']);
+ assertSame(json_encode($balances),json_encode(service()->ledger->balances($u)));assertSame($entries,db()->row('SELECT COUNT(*) n FROM ledger_entries')['n']);
+ assertSame($before['image_path'],$r['previous']['image_path']);check($r['previous']['version']!==$r['current']['version'],'Versão muda.');
+ $audit=db()->row('SELECT * FROM audit_events WHERE operation_id=?',[$r['operation_id']]);assertSame(1,$audit['actor_id']);
+ assertSame('admin.nft.image_replace',$audit['kind']);$body=json_decode($audit['data'],true);
+ assertSame($data['reason'],$body['input']['reason']);assertSame($before['image_path'],$body['result']['previous']['image_path']);
+ assertSame('IMAGE_REPLACED',db()->row('SELECT kind FROM nft_events WHERE nft_id=? ORDER BY id DESC LIMIT 1',[$n])['kind']);
+ $q=new Piscina\Queries(service());$admin=$q->adminNft(1,['nft_id'=>(string)$n]);$public=$q->nft($n);
+ assertSame(Piscina\NftImage::version($after),$public['image_version']);assertSame(Piscina\NftImage::editVersion($after),$admin['edit_version']);
+ check(!isset($public['edit_version'],$public['image_path']),'Consulta pública sem token administrativo ou caminhos.');
+});
+test('Troca de imagem é exclusiva de admin; mantém envio único do criador',function(){
+ [$u,$n]=user('Ana');[$other]=user('Bia');$data=adminImageData($n);
+ fail(fn()=>op($u,'admin.nft.image_replace',$data),403);fail(fn()=>op($other,'admin.nft.image_replace',$data),403);
+ $q=new Piscina\Queries(service());fail(fn()=>$q->adminNft($u,['nft_id'=>(string)$n]),403);
+ $r=op(1,'admin.nft.image_replace',$data);$after=adminImageData($n);
+ fail(fn()=>op($u,'nft.image',$after));assertSame($data['image_path'],db()->row('SELECT image_path FROM nfts WHERE id=?',[$n])['image_path']);
+});
+test('Troca administrativa exige motivo, confirmação, versão e par JPEG válido',function(){
+ [$u,$n]=user('Ana');$data=adminImageData($n);$old=db()->row('SELECT * FROM nfts WHERE id=?',[$n]);
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['reason'=>'x'])),422);
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['reason'=>['invalido']])),422);
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['confirm'=>false])),422);
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['expected_version'=>str_repeat('0',64)])));
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['thumbnail_path'=>'../../fora.jpg'])),422);
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['image_sha'=>'invalid'])),422);
+ unlink(config()['storage'].'/images/'.$data['thumbnail_path']);fail(fn()=>op(1,'admin.nft.image_replace',$data));
+ assertSame(json_encode($old),json_encode(db()->row('SELECT * FROM nfts WHERE id=?',[$n])));
+ assertSame(0,db()->row("SELECT COUNT(*) n FROM operations WHERE action='admin.nft.image_replace'")['n']);
+});
+test('Troca bloqueada para NFT reservada e para custódia alterada desde a consulta',function(){
+ [$a,$n]=user('Ana');[$b]=user('Bia');$old=adminImageData($n);$p=proposal($b,$a,'NFT','1','10.00',true,$n);
+ fail(fn()=>op(1,'admin.nft.image_replace',$old));op($a,'proposal.cancel',['proposal_id'=>$p['proposal_id'],'version'=>'1']);
+ sale($b,$a,'NFT','1','10.00',$n);fail(fn()=>op(1,'admin.nft.image_replace',$old));
+ $fresh=adminImageData($n);op(1,'admin.nft.image_replace',$fresh);assertSame($b,db()->row('SELECT owner_id FROM nfts WHERE id=?',[$n])['owner_id']);
+});
+test('Duas trocas simultâneas com a mesma versão têm um vencedor',function(){
+ [$u,$n]=user('Ana');$one=adminImageData($n);$two=adminImageData($n);
+ $r=concurrent([['actor'=>1,'action'=>'admin.nft.image_replace','data'=>$one],['actor'=>1,'action'=>'admin.nft.image_replace','data'=>$two]]);
+ assertSame(1,count(array_filter($r,fn($v)=>$v['ok'])));
+ assertSame(1,db()->row("SELECT COUNT(*) n FROM nft_events WHERE kind='IMAGE_REPLACED'")['n']);
+ assertSame(1,db()->row("SELECT COUNT(*) n FROM audit_events WHERE kind='admin.nft.image_replace'")['n']);
+});
+test('Replay da troca não duplica evento e chave diferente com versão antiga falha',function(){
+ [$u,$n]=user('Ana');$data=adminImageData($n);$key=testKey();$r=op(1,'admin.nft.image_replace',$data,$key);
+ $retry=adminImageData($n,$data['expected_version']);$retry['image_sha']=$data['image_sha'];
+ assertSame($r['operation_id'],op(1,'admin.nft.image_replace',$retry,$key)['operation_id']);
+ fail(fn()=>op(1,'admin.nft.image_replace',$retry));
+ fail(fn()=>op(1,'admin.nft.image_replace',array_replace($data,['reason'=>'Outro motivo documentado']),$key));
+ assertSame(1,db()->row("SELECT COUNT(*) n FROM nft_events WHERE kind='IMAGE_REPLACED'")['n']);
+});
+test('Cron preserva versões auditadas e remove somente órfãos antigos',function(){
+ [$u,$n]=user('Ana');$old=adminImageData($n);op($u,'nft.image',$old);$data=adminImageData($n);op(1,'admin.nft.image_replace',$data);
+ $orphan=adminImageData($n);$dir=config()['storage'].'/images';
+ foreach([$old,$data,$orphan] as $set)foreach(['image_path','thumbnail_path'] as $key)touch($dir.'/'.$set[$key],time()-172800);
+ (new Piscina\Upload(service(),config()))->cleanup();
+ foreach([$old,$data] as $set)foreach(['image_path','thumbnail_path'] as $key)check(is_file($dir.'/'.$set[$key]),'Versão auditada preservada.');
+ check(!is_file($dir.'/'.$orphan['image_path'])&&!is_file($dir.'/'.$orphan['thumbnail_path']),'Órfãos removidos.');
+});
+test('Troca em NFT na piscina não altera economia nem captura calendário atrasado',function(){
+ [$u,$n]=user('Ana');op($u,'nft.deposit',['nft_id'=>(string)$n]);$data=adminImageData($n);$balances=service()->ledger->balances($u);
+ db()->run('UPDATE parameter_versions SET interval_minutes=1440,first_cutoff=DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 40 DAY)');
+ $r=op(1,'admin.nft.image_replace',$data);assertSame(null,$r['owner_id']);assertSame('POOL',$r['state']);
+ assertSame(json_encode($balances),json_encode(service()->ledger->balances($u)));
+ assertSame(0,db()->row('SELECT COUNT(*) n FROM periods')['n']);
+});
+require __DIR__.'/danger-domain.php';
 echo "\n$tests cenários, $failed falhas. MySQL ".db()->row('SELECT VERSION() v')['v'].', PHP '.PHP_VERSION."\n";exit($failed?1:0);

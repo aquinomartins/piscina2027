@@ -1,0 +1,174 @@
+DANGER ZONE — RESULTADOS DE VERIFICAÇÃO
+Data: 2026-10-29T11:21:20-03:00
+Base: main 81702ac, com integração da troca de imagem do PR #7 (f0ac192).
+PHP 8.3.36 / MySQL 8.0.46 / Chromium automatizado / banco descartável piscina_test em demo.
+Nenhum SQL, sanção, teste de carga ou implantação foi executado na produção. Nenhuma mensagem SMTP real foi enviada.
+
+DECISÃO DO RESPONSÁVEL
+Cotas de participantes excluídos continuam no cálculo atual. Direitos e taxas permanecem pendentes, ligados à origem no fundo, sem liberação ou pagamento automático.
+
+DOMÍNIO, CONTABILIDADE, IMAGENS E SANÇÕES
+PASS Aprovação concorrente concede 160000 centavos e uma NFT
+PASS Depósito concorrente com mesma chave não duplica; conflito de conteúdo
+PASS Retirada pública em mR$, cotas independentes e redepósito
+PASS 10 BYC não retiram por 11; pagamento único em mR$
+PASS Retiradas concorrentes: somente vencedor paga
+PASS Venda de 3 BYC por mR$90 sem emissão; segunda aprovação única
+PASS Ciclo por BYC custa 1 BYC líquido e não destrói cota
+PASS Venda de NFT preserva criador, venda de cota não acompanha NFT
+PASS Contraproposta libera reservas e invalida versão anterior
+PASS Proposta não reserva patrimônio alheio; saldo reservado não pode gastar
+PASS Expiração na ação libera recursos, mesmo antes do cron
+PASS Cancelamento e segunda aprovação concorrentes têm um único desfecho
+PASS Revisão e aprovação concorrentes preservam versão e reservas
+PASS Dois gastos incompatíveis não criam saldo negativo
+PASS N4 Q10 q3: bruto 240, taxa 100, líquido 140; participante sem cotas
+PASS Venda depois do corte não transfere direito, cron atrasado usa snapshot
+PASS Maiores restos: 6667,6667,6666; soma conserva D
+PASS N=0 Q=0 e taxa com saldo insuficiente permanecem válidos
+PASS Parâmetros novos não reescrevem obrigações nem cotação anterior
+PASS Produção não presume política nem data inicial
+PASS Precisão decimal, escala mR$, limites e JSON strings
+PASS Autorização: cadastro pendente e ativos de terceiros não movimentam
+PASS Retomada de processamento em lotes não publica direitos parciais
+PASS Períodos atrasados preservam retratos ordenados distintos
+PASS Reconciliação detecta adulteração de saldo agregado
+PASS Transação atravessa corte: eficácia pelo gate e snapshot anterior à próxima alteração
+PASS Uploads concorrentes preservam direito único e mesma chave usa hash do conteúdo
+PASS Falha de imagem não consome envio; somente criador autorizado
+PASS Tokens de e-mail e recuperação expiram, uso único e senha revoga sessões
+PASS Anúncio não liquida nem reserva; cancelamento remove publicação
+PASS Preço zero ou fração com total zero mantém entrega e não cria pagamento fictício
+PASS Deadlock MySQL real faz rollback e tentativa limitada sem duplicar efeitos
+PASS Cron recupera calendário longo por lotes; operação não ultrapassa cortes pendentes
+PASS Gasto novo libera reserva vencida do autor antes de validar saldo
+PASS Aprovação sem e-mail exige admin, motivo e confirmação; não falsifica verificação
+PASS Aprovação excepcional concorrente concede uma única carteira e NFT
+PASS Aprovação excepcional respeita limites e rollback da concessão
+PASS Reaprovação de concessão anterior preserva gastos, cotas e NFT
+PASS Carteiras administrativas negam participantes e não vazam para perfil público
+PASS Busca administrativa literal e paginação alcançam todos os cadastros sem criar contas
+PASS Extrato administrativo paginado e custódia contam apenas o último depositante
+PASS Troca administrativa substitui somente imagem/miniatura, com auditoria e proveniência
+PASS Troca de imagem é exclusiva de admin; mantém envio único do criador
+PASS Troca administrativa exige motivo, confirmação, versão e par JPEG válido
+PASS Troca bloqueada para NFT reservada e para custódia alterada desde a consulta
+PASS Duas trocas simultâneas com a mesma versão têm um vencedor
+PASS Replay da troca não duplica evento e chave diferente com versão antiga falha
+PASS Cron preserva versões auditadas e remove somente órfãos antigos
+PASS Troca em NFT na piscina não altera economia nem captura calendário atrasado
+PASS Danger: multa conserva mR$ e não utiliza emissão, reservas ou dívida
+PASS Danger: participantes, contas admin, motivo e confirmação são protegidos
+PASS Danger: banimento cancela negócios e libera reservas de ambas as partes
+PASS Danger: expiração independe do Cron e não aprova ou verifica cadastro
+PASS Danger: exclusão preserva patrimônio de terceiros, NFTs POOL e proveniência
+PASS Danger: confirmação forte de exclusão e rollback preservam ativos
+PASS Danger: falha durante custódia faz rollback integral da exclusão e das transferências
+PASS Danger: reservas de contraparte são liberadas antes da custódia
+PASS Danger: reserva órfã impede exclusão parcial e mantém acesso e saldo
+PASS Danger: cotas em custódia conservam Q, direitos e taxas pendentes nos cortes futuros
+PASS Danger: concorrência banimento/operação respeita ordem do gate
+PASS Danger: multa concorrente não ultrapassa saldo e não duplica chave
+PASS Danger: senha administrativa é idempotente e não aparece em auditoria ou recibos
+PASS Danger: redefinição não remove banimento nem aprova pendência; excluído é recusado
+
+63 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+CADASTRO DE TURMAS E LIMITADORES
+PASS Janela fixa: dez tentativas; rejeição persistida sem ampliar validade
+PASS Contador saturado não estoura INT nem prolonga bloqueio
+PASS 32 chamadas na mesma chave (new): contagem exata e sem deadlock
+PASS 32 chamadas na mesma chave (existing): contagem exata e sem deadlock
+PASS 32 chamadas na mesma chave (expired): contagem exata e sem deadlock
+PASS Expiração reinicia em um; igualdade com horário atual também expira
+PASS Limites independentes por tipo e identidade
+PASS 25 cadastros simultâneos na mesma rede criam uma conta, token e outbox por aluno
+PASS Limite padrão da rede permite 50 e bloqueia a tentativa 51
+PASS Mesmo e-mail normalizado tem três tentativas, sem repetir token ou consumir global após bloqueio
+PASS 12 IPs simultâneos respeitam teto global configurado de seis
+PASS Teto global padrão continua bloqueando apesar de troca de IP e e-mail
+PASS Contadores legados preservam janela e não exigem limpeza ou migration
+PASS Configuração parcial mantém outros padrões e rejeitados por IP não gastam global
+PASS Duas inscrições do mesmo e-mail em paralelo: uma conta, um token e conflito 409
+PASS Formulários inválidos não geram conta, token ou contador de cadastro
+PASS Reenvio de token mantém quatro tentativas por origem e e-mail
+PASS Confirmação de senha mantém dez tentativas por usuário
+PASS Configuração insegura é recusada antes de criar contadores
+19 casos aprovados; 0 falhas.
+
+
+BROWSER
+PASS Viewport 1440: sem rolagem horizontal
+PASS Viewport 320: sem rolagem horizontal
+PASS Viewport 360: sem rolagem horizontal
+PASS Viewport 390: sem rolagem horizontal
+PASS Viewport 412: sem rolagem horizontal
+PASS API: sessão e CSRF obrigatórios
+PASS Login e portfólio conectados
+PASS Proposta guiada reserva apenas o vendedor
+PASS Logout e histórico não recuperam carteira privada
+PASS Segunda aprovação liquida BYC e mR$
+PASS Retirada pública por uma modalidade
+PASS Administração, calendário e execução finita de tarefas
+PASS Upload real reencodificado e associado
+PASS Recebimento bruto e pagamento independente da taxa
+PASS Cache contém somente recursos estáticos autorizados
+PASS Offline exibe página neutra, sem carteira cacheada ou envio automático
+PASS Manifesto, ícones e start_url de portfólio
+
+ADMIN-BROWSER
+PASS Anônimo e participante não acessam carteiras administrativas nem aprovam cadastros
+PASS API exige CSRF, senha atual, motivo e confirmação; aprovação comum continua exigindo e-mail
+PASS Admin responsivo em sete larguras; paginação avança e retorna sem perder usuários
+PASS Aprovação excepcional pela interface mantém e-mail pendente e concede saldo/NFT uma única vez
+PASS Carteira individual e extrato visíveis em desktop e mobile, com nomes escapados
+PASS Repetição e idempotência preservam crédito/NFT; ação fica na auditoria administrativa
+PASS Logout remove os dados administrativos e voltar não recupera as carteiras
+
+ADMIN-IMAGE-BROWSER
+PASS Acesso ao upload e consulta restrito ao Admin, inclusive com NFT de outro criador na piscina
+PASS CSRF, senha, motivo, confirmação, MIME real e tamanho verificados; falhas mantêm a imagem anterior
+PASS Troca pela interface com prévia, confirmação e versão atual; propriedade, custódia e economia preservadas
+PASS Replay retorna o recibo sem duplicar; versão antiga e conteúdo conflitante são bloqueados; auditoria sem senha
+PASS Original e miniatura reencodificados; cache versionado chega ao mercado; envio único do criador continua bloqueado
+PASS Resposta perdida após commit recupera recibo real, sem reenviar nem duplicar a troca
+PASS Dados e imagens fora do cache do PWA; logout encerra acesso administrativo
+
+DANGER-BROWSER
+PASS Autorização, API direta, CSRF e senha administrativa obrigatórios
+PASS Danger Zone e troca de imagem únicas, sem overflow em cinco larguras
+PASS Multa pela interface com prévia, confirmação e débito correto
+PASS Banimento encerra sessão aberta e impede login; desbloqueio exige confirmação
+PASS Redefinição administrativa sem e-mail revoga senha/sessão e não vaza credenciais
+PASS Resposta perdida recupera recibo sem repetir multa ou reter senha
+PASS Recuperação pública em página aberta e navegador anônimo; GET não consome; tokens inválidos, usados e expirados recusados
+PASS Exclusão definitiva move ativos à custódia privada, bloqueia reaprovação e preserva origem
+
+DANGER-BROWSER-SUBFOLDER
+PASS Autorização, API direta, CSRF e senha administrativa obrigatórios
+PASS Danger Zone e troca de imagem únicas, sem overflow em cinco larguras
+PASS Multa pela interface com prévia, confirmação e débito correto
+PASS Banimento encerra sessão aberta e impede login; desbloqueio exige confirmação
+PASS Redefinição administrativa sem e-mail revoga senha/sessão e não vaza credenciais
+PASS Resposta perdida recupera recibo sem repetir multa ou reter senha
+PASS Recuperação pública em página aberta e navegador anônimo; GET não consome; tokens inválidos, usados e expirados recusados
+PASS Exclusão definitiva move ativos à custódia privada, bloqueia reaprovação e preserva origem
+
+PWA — RAIZ E SUBPASTA
+PASS /: menu acessível em 320/360/390/412/700/701/1440 px; navegação mobile preservada
+PASS /: Baixar o app usa prompt quando disponível e instruções como alternativa
+PASS /: atualização real via menu, waiting pré-existente, bloqueio de operação e recarga única aprovados
+PASS /piscina: menu acessível em 320/360/390/412/700/701/1440 px; navegação mobile preservada
+PASS /piscina: Baixar o app usa prompt quando disponível e instruções como alternativa
+PASS /piscina: atualização real via aviso da tela inicial, waiting pré-existente, bloqueio de operação e recarga única aprovados
+
+RECUPERAÇÃO — COMPARAÇÃO REPRODUZIDA
+JavaScript anterior: formulário abre na carga inicial, mas não ao mudar #reset na página já aberta.
+JavaScript corrigido: formulário abre em ambos os cenários. Os testes completos usam token real do banco de demo, validam POST, senha nova, invalidação da antiga, GET sem consumo, expiração, uso único e redirecionamento local preservando fragmento.
+
+MIGRAÇÃO E PACOTES
+Upgrade 001+002 -> 003 aplicado duas vezes: usuário, saldos e ledger preservados; conciliação sem divergências.
+Migração 003 composta por CREATE TABLE IF NOT EXISTS e marcação de versão; preserva tabelas e saldos existentes. Pacote incremental inclui conjunto completo da integração de imagem e Danger Zone, uma migração e documentação. A chave privada em storage não integra nenhum pacote.
+
+LIMITAÇÕES
+TLS, DNS, configuração URL/www, PHP/OPcache e envio SMTP da Superdomínios não foram inspecionados. O redirecionamento e a recuperação foram verificados localmente na raiz e em /piscina, sem simular entrega real de e-mail ou certificado de produção. A inspeção de telas foi feita no Chromium, não em aparelhos físicos. A exclusão conserva registros técnicos/históricos e não oferece reativação pelo painel.

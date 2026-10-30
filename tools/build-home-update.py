@@ -1,4 +1,4 @@
-"""Pacote visual da home para a base main 81702ac, sem dados privados."""
+"""Pacote visual da home para instalações com a Danger Zone da PR #9."""
 from pathlib import Path
 import hashlib
 import zipfile
@@ -8,13 +8,16 @@ FILES = (
     'public/index.php', 'public/assets/app.js', 'public/sw.js',
     'public/assets/home-hero.css', 'public/assets/piscina-home-1280.webp',
     'public/assets/piscina-home-2125.webp', 'docs/HOME_ILUSTRADA.md',
-    'docs/images/home-desktop.webp', 'docs/images/home-mobile.webp',
+    'docs/images/home-desktop.webp', 'docs/images/home-mobile.webp', 'docs/DANGER_ZONE.md',
 )
 
 
 def main():
-    if (ROOT / 'app/AdminDanger.php').exists():
-        raise SystemExit('Integre e valide o pacote completo da Danger Zone; este pacote visual é para a base main 81702ac.')
+    required = ('app/AdminDanger.php', 'public/assets/admin-danger.js',
+                'database/migrations/003_admin_danger.sql')
+    if not all((ROOT / name).is_file() for name in required):
+        raise SystemExit('Este pacote pressupõe a versão com a PR #9 (Danger Zone).')
+    assert 'assets/admin-danger.js' in (ROOT / 'public/sw.js').read_text()
     payload = {name: (ROOT / name).read_bytes() for name in FILES}
     payload['SHA256SUMS_HOME.txt'] = ''.join(
         f'{hashlib.sha256(data).hexdigest()}  {name}\n'
