@@ -27,7 +27,7 @@ final class Ledger {
     public function issue(int $user, string $asset, string $amount, string $ref, string $op): void { $this->move($this->account(null,$asset,'issuance'),$this->account($user,$asset),$amount,'ISSUANCE',$ref,$op); }
     public function balances(int $user): array {
         $out=[]; foreach(['MR','BYC','SHARE'] as $asset) $out[$asset]=['available'=>'0','reserved'=>'0'];
-        foreach($this->db->all("SELECT asset,purpose,balance FROM accounts WHERE user_id=? AND purpose IN ('wallet','reserved')",[$user]) as $r) $out[$r['asset']][$r['purpose']==='reserved'?'reserved':'available']=$r['balance'];
+        foreach($this->db->all("SELECT asset,purpose,balance FROM accounts WHERE user_id=? AND purpose IN ('wallet','reserved','galeria_hold')",[$user]) as $r) $out[$r['asset']][$r['purpose']==='wallet'?'available':'reserved']=bcadd($out[$r['asset']][$r['purpose']==='wallet'?'available':'reserved'],$r['balance'],0);
         return $out;
     }
     public function reconcile(): array {
@@ -39,6 +39,7 @@ final class Ledger {
         $nftReserves=$this->db->all("SELECT n.id FROM nfts n LEFT JOIN reservations r ON r.proposal_id=n.reserved_proposal AND r.asset='NFT' AND r.state='ACTIVE' WHERE n.reserved_proposal IS NOT NULL AND r.id IS NULL");
         $distribution=$this->db->all("SELECT a.code,a.balance,COALESCE(r.pending,0) expected FROM accounts a LEFT JOIN (SELECT period_id,SUM(amount) pending FROM rights WHERE state='PENDING' GROUP BY period_id) r ON r.period_id=SUBSTRING_INDEX(a.code,':',-1) WHERE a.purpose='distribution' AND a.balance<>COALESCE(r.pending,0)");
         $escrow=$this->db->all("SELECT n.id FROM nfts n LEFT JOIN admin_nft_custody c ON c.nft_id=n.id WHERE (n.state='CUSTODY' AND (n.owner_id IS NOT NULL OR c.nft_id IS NULL)) OR (c.nft_id IS NOT NULL AND n.state<>'CUSTODY')");
-        return compact('balances','unbalanced','negative','reserves','custody','nftReserves','distribution','escrow');
+        $galeria=GaleriaQueries::reconcile($this->db);
+        return compact('galeria','balances','unbalanced','negative','reserves','custody','nftReserves','distribution','escrow');
     }
 }

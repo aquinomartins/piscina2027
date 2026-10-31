@@ -1,0 +1,157 @@
+Verificação local: PHP 8.3.36 / MySQL 8.0.46; não é validação da produção.
+Base 003 + banner PR #10. Galeria desligada por padrão.
+
+baseline-domain.log
+
+63 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+baseline-auth.log
+PASS Configuração insegura é recusada antes de criar contadores
+19 casos aprovados; 0 falhas.
+
+regression-final.log
+
+90 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+regression-off.log
+
+63 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+Suíte focada final
+PASS Galeria: desabilitada/pause bloqueia novas compras e mantém o jogo antigo
+PASS Galeria: quatro coalizões guardam exatamente 16 cotas canônicas com direitos preservados
+PASS Galeria: compra concorrente tem um vencedor e mantém autoridade e histórico
+PASS Galeria: saldo insuficiente no segundo aceite não cobra parcialmente
+PASS Galeria: versões e percentuais manipulados são rejeitados sem reserva
+PASS Galeria: agenda concorrente e gasto antigo das mesmas cotas conservam saldo
+PASS Galeria: política nova não reescreve acordo; cancelamento consensual funciona pausado
+PASS Galeria: NFT pública é inelegível e continua retirável; mudança posterior suspende
+PASS Galeria: evento exige mínimo, infraestrutura e prêmio financiado
+PASS Galeria: credencial única, partes interessadas e voto concorrente por conta
+PASS Galeria: vencedor 60/40 recebe 600 e 400; repetição não paga novamente
+PASS Galeria: empate compartilha prêmio e ranking denso sem desempate oculto
+PASS Galeria: sem votos devolve prêmio, conta participações e captura prestação cumprida
+PASS Galeria: revisão registra nova versão sem revelar parciais ou identidades públicas
+PASS Galeria: disputa real entre reserva antiga de cotas e aceite novo não gasta duas vezes
+PASS Galeria: encerrar concorrente com voto fecha um conjunto consistente
+PASS Galeria: resíduo em empate vai por ID e depois para parcela da Moldura
+PASS Galeria: mídia congelada permanece privada na suspensão e não é apagada pelo cron
+PASS Galeria: revenda após prestação não muda beneficiários nem créditos do prêmio
+PASS Galeria: apagar rascunho é permitido, mas ativo emitido preserva histórico
+PASS Galeria: reserva preserva Q e direitos originais nos cortes
+PASS Galeria: exclusão administrativa encaminha Moldura à custódia e devolve cotas ao fundo
+PASS Galeria: negociação bilateral de revenda aceita contraproposta livre e preserva recibos
+PASS Galeria: negociação pendente não cobra e segundo aceite respeita compromissos
+PASS Galeria: negociação de Moldura não aceita Admin ou terceiro no lugar da contraparte
+PASS Galeria: ocupação usa horas registradas e preserva o histórico após arquivamento
+PASS Galeria: incidente posterior ao pagamento não altera saldos ou resultado
+PASS Galeria: preparação sequencial do Admin não consome o limite de falhas nem o antigo
+PASS Galeria: confirmação de senha bloqueia dez falhas e terceiro não confirma como Admin
+PASS Galeria: alteração de local cancela oferta antiga e exige novo consentimento na revenda
+
+30 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+
+browser-ui-release
+PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
+PASS Banner da home e navegação anterior preservados
+PASS Admin → Galeria e Danger Zone coexistem; painel legível em celular e desktop
+PASS Cadastro de Moldura pela interface com senha, metadados validados e auditoria
+PASS Fotografia reencodificada; rascunho e imagem privados para visitante
+PASS Permissões por objeto, Admin e preço conferidos no servidor
+PASS Compra pela interface recupera resposta perdida sem duplicar débito ou titularidade
+PASS Proposta, resumo integral, contraproposta e aceite da mesma versão reservam X de cada parte
+PASS Versão antiga e consulta de acordo alheio recusadas sem cobrança adicional
+PASS Suspensão pela Administração mantém cancelamento consensual e devolução integral
+PASS Negociação de preço pela interface: proposta, contraproposta e segundo aceite transferem Moldura e pagamento juntos
+PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
+
+browser-ui-sub-release
+PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
+PASS Banner da home e navegação anterior preservados
+PASS Admin → Galeria e Danger Zone coexistem; painel legível em celular e desktop
+PASS Cadastro de Moldura pela interface com senha, metadados validados e auditoria
+PASS Fotografia reencodificada; rascunho e imagem privados para visitante
+PASS Permissões por objeto, Admin e preço conferidos no servidor
+PASS Compra pela interface recupera resposta perdida sem duplicar débito ou titularidade
+PASS Proposta, resumo integral, contraproposta e aceite da mesma versão reservam X de cada parte
+PASS Versão antiga e consulta de acordo alheio recusadas sem cobrança adicional
+PASS Suspensão pela Administração mantém cancelamento consensual e devolução integral
+PASS Negociação de preço pela interface: proposta, contraproposta e segundo aceite transferem Moldura e pagamento juntos
+PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
+
+browser-live-final
+PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
+PASS Banner da home e navegação anterior preservados
+PASS QR das quatro Molduras abre o mesmo evento; eleitor credenciado vota uma vez e partes interessadas são recusadas
+PASS Sem parciais, dados eleitorais ou caminhos privados na resposta pública
+PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
+
+browser-live-sub
+PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
+PASS Banner da home e navegação anterior preservados
+PASS QR das quatro Molduras abre o mesmo evento; eleitor credenciado vota uma vez e partes interessadas são recusadas
+PASS Sem parciais, dados eleitorais ou caminhos privados na resposta pública
+PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
+
+native-browser
+PASS Viewport 1440: sem rolagem horizontal
+PASS Viewport 320: sem rolagem horizontal
+PASS Viewport 360: sem rolagem horizontal
+PASS Viewport 390: sem rolagem horizontal
+PASS Viewport 412: sem rolagem horizontal
+PASS API: sessão e CSRF obrigatórios
+PASS Login e portfólio conectados
+PASS Proposta guiada reserva apenas o vendedor
+PASS Logout e histórico não recuperam carteira privada
+PASS Segunda aprovação liquida BYC e mR$
+PASS Retirada pública por uma modalidade
+PASS Administração, calendário e execução finita de tarefas
+PASS Upload real reencodificado e associado
+PASS Recebimento bruto e pagamento independente da taxa
+PASS Cache contém somente recursos estáticos autorizados
+PASS Offline exibe página neutra, sem carteira cacheada ou envio automático
+PASS Manifesto, ícones e start_url de portfólio
+
+native-admin-image-browser
+PASS Acesso ao upload e consulta restrito ao Admin, inclusive com NFT de outro criador na piscina
+PASS CSRF, senha, motivo, confirmação, MIME real e tamanho verificados; falhas mantêm a imagem anterior
+PASS Troca pela interface com prévia, confirmação e versão atual; propriedade, custódia e economia preservadas
+PASS Replay retorna o recibo sem duplicar; versão antiga e conteúdo conflitante são bloqueados; auditoria sem senha
+PASS Original e miniatura reencodificados; cache versionado chega ao mercado; envio único do criador continua bloqueado
+PASS Resposta perdida após commit recupera recibo real, sem reenviar nem duplicar a troca
+PASS Dados e imagens fora do cache do PWA; logout encerra acesso administrativo
+
+native-danger-browser
+PASS Autorização, API direta, CSRF e senha administrativa obrigatórios
+PASS Danger Zone e troca de imagem únicas, sem overflow em cinco larguras
+PASS Multa pela interface com prévia, confirmação e débito correto
+PASS Banimento encerra sessão aberta e impede login; desbloqueio exige confirmação
+PASS Redefinição administrativa sem e-mail revoga senha/sessão e não vaza credenciais
+PASS Resposta perdida recupera recibo sem repetir multa ou reter senha
+PASS Recuperação pública em página aberta e navegador anônimo; GET não consome; tokens inválidos, usados e expirados recusados
+PASS Exclusão definitiva move ativos à custódia privada, bloqueia reaprovação e preserva origem
+
+pwa-release
+PASS /: menu acessível em 320/360/390/412/700/701/1440 px; navegação mobile preservada
+PASS /: Baixar o app usa prompt quando disponível e instruções como alternativa
+PASS /: atualização real via menu, waiting pré-existente, bloqueio de operação e recarga única aprovados
+PASS /piscina: menu acessível em 320/360/390/412/700/701/1440 px; navegação mobile preservada
+PASS /piscina: Baixar o app usa prompt quando disponível e instruções como alternativa
+PASS /piscina: atualização real via aviso da tela inicial, waiting pré-existente, bloqueio de operação e recarga única aprovados
+
+PASS Migração 004 aplicada duas vezes; 31 tabelas antigas preservadas, saldo e NFT originais intactos; conciliação vazia e entrada comercial suspensa.
+
+
+Conciliação após demonstração
+{
+    "galeria": [],
+    "balances": [],
+    "unbalanced": [],
+    "negative": [],
+    "reserves": [],
+    "custody": [],
+    "nftReserves": [],
+    "distribution": [],
+    "escrow": []
+}

@@ -12,6 +12,7 @@ return [
     'registration_limits' => ['per_ip' => 50, 'per_email' => 3, 'global' => 100],
     'smtp' => ['host' => '', 'port' => 587, 'username' => '', 'password' => '', 'encryption' => 'tls', 'from' => '', 'name' => 'Piscina de Liquidez'],
     'mail_transport' => 'smtp', // 'file' permitido somente em demo
+    'galeria' => ['enabled' => false], // instale 004 e configure as condições antes de habilitar
     'max_users' => 500, 'max_nfts' => 5000, 'snapshot_periods_per_run' => 10, 'upload_bytes' => 5242880, 'upload_pixels' => 16000000,
     'max_batch' => 100, 'cron_seconds' => 50,
     'http_tasks' => ['enabled' => false, 'token_hash' => ''], // bearer aleatório, somente hash privado

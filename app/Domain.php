@@ -26,7 +26,7 @@ final class Domain {
             if(array_diff(array_keys($data),['user_id','reason','confirm','amount','until','confirmation']))throw new Problem('Campos não permitidos.');
         }
         if(!preg_match('/^[A-Za-z0-9_-]{16,80}$/D',$key)) throw new Problem('Chave de idempotência inválida.');
-        $hashData=$data;if(in_array($action,['nft.image','admin.nft.image_replace'],true))unset($hashData['image_path'],$hashData['thumbnail_path']);$hash=hash('sha256',self::canonical($hashData));
+        $hashData=$data;if($action==='admin.galeria.event.credential'&&isset($hashData['credential_ref']))$hashData['credential_ref']=hash_hmac('sha256',(string)$hashData['credential_ref'],CredentialKey::get($this->config));if($action==='admin.galeria.frame.photo')unset($hashData['path']);if(in_array($action,['nft.image','admin.nft.image_replace'],true))unset($hashData['image_path'],$hashData['thumbnail_path']);$hash=hash('sha256',self::canonical($hashData));
         return $this->db->transaction(function() use($actor,$action,$data,$key,$hash) {
             $gate=$this->db->row('SELECT * FROM economic_gate WHERE id=1 FOR UPDATE');
             Restrictions::check($this->db,$actor);
@@ -52,10 +52,11 @@ final class Domain {
                 'nft.image'=>$this->associateImage($actor,$data),
                 'admin.nft.image_replace'=>$this->replaceNftImage($actor,$data),
                 'admin.danger.fine','admin.danger.ban','admin.danger.unban','admin.danger.delete'=>(new AdminDanger($this,$this->op,$this->effective))->apply($actor,$action,$data),
-                default=>throw new Problem('Ação desconhecida.',404)
+                default=>preg_match('/^(admin\.)?galeria\./D',$action)?(new Galeria($this,$this->op,$this->effective))->apply($actor,$action,$data):throw new Problem('Ação desconhecida.',404)
             };
+            (new Galeria($this,$this->op,$this->effective))->reconcileAffected($action,$data);
             $result['operation_id']=$this->op;
-            $this->audit($actor,$action,['input'=>$data,'result'=>$result]);
+            $this->audit($actor,$action,['input'=>preg_match('/^(admin\.)?galeria\./D',$action)?Galeria::auditInput($data,$action):$data,'result'=>$result]);
             $this->db->run('UPDATE operations SET result=? WHERE id=?',[json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$this->op]);
             return $result;
         });
