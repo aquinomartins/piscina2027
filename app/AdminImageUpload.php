@@ -52,11 +52,7 @@ final class AdminImageUpload {
 
     private function discardUnused(array $paths): void {
         if(!$paths)return;
-        $used=$this->domain->db->row("SELECT
-            (EXISTS(SELECT 1 FROM nfts WHERE image_path=?) OR
-             EXISTS(SELECT 1 FROM audit_events WHERE kind='admin.nft.image_replace'
-                    AND JSON_UNQUOTE(JSON_EXTRACT(data,'$.input.image_path'))=?)) used",[$paths[0],$paths[0]]);
-        if($used['used']==='1')return;
+        if(ImageReferences::used($this->domain->db,$paths[0]))return;
         foreach($paths as $path) {
             $file=$this->config['storage'].'/images/'.$path;
             if(is_file($file))unlink($file);

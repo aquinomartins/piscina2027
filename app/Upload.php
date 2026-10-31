@@ -23,10 +23,10 @@ final class Upload {
                 if(!imagejpeg($img,$dir.'/'.$paths[$i],86)) throw new \RuntimeException('Falha ao salvar imagem.');imagedestroy($img);chmod($dir.'/'.$paths[$i],0600);
             }
             $result=$this->domain->operation($actor,'nft.image',['nft_id'=>(string)$nft,'image_path'=>$paths[0],'thumbnail_path'=>$paths[1],'image_sha'=>$sha],$key);
-            $used=$this->domain->db->row('SELECT id FROM nfts WHERE image_path=?',[$paths[0]]);if(!$used)foreach($paths as $p)if(is_file($dir.'/'.$p))unlink($dir.'/'.$p);return $result;
+            $used=ImageReferences::used($this->domain->db,$paths[0]);if(!$used)foreach($paths as $p)if(is_file($dir.'/'.$p))unlink($dir.'/'.$p);return $result;
         } catch(\Throwable $e) {
             // Resultado desconhecido após commit: só remove se nenhum registro se associou aos arquivos.
-            $used=$this->domain->db->row('SELECT id FROM nfts WHERE image_path=?',[$paths[0]]);
+            $used=ImageReferences::used($this->domain->db,$paths[0]);
             if(!$used) foreach($paths as $p) if(is_file($dir.'/'.$p)) unlink($dir.'/'.$p);
             throw $e;
         } finally {imagedestroy($source);}
@@ -42,6 +42,7 @@ final class Upload {
             FROM audit_events WHERE kind='admin.nft.image_replace'") as $r) {
             foreach($r as $path)if(is_string($path)&&preg_match('/^[a-f0-9]{32}(?:-thumb)?\.jpg$/D',$path))$associated[$path]=true;
         }
+        if(Galeria::installed($this->domain->db))foreach($this->domain->db->all("SELECT JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.image_path')) p,JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.thumbnail_path')) t FROM galeria_agreements") as $r)foreach($r as $path)if(is_string($path))$associated[$path]=true;
         foreach(glob($dir.'/*.jpg') as $file) {if(filemtime($file)>time()-86400) continue;$name=basename($file);if(!isset($associated[$name])) {unlink($file);$count++;}}
         return $count;
     }

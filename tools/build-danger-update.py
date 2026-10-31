@@ -21,6 +21,8 @@ FILES = RUNTIME + (
 
 
 def main():
+    if (ROOT / 'app/Galeria.php').exists():
+        raise SystemExit('Use tools/build-galeria-update.py: os pacotes anteriores não contêm as dependências da Galeria.')
     payload = {name: (ROOT / name).read_bytes() for name in FILES}
     assert not any(name.startswith(('storage/', 'config/', 'tests/')) for name in payload)
     payload['SHA256SUMS_DANGER.txt'] = ''.join(
