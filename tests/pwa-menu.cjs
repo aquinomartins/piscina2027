@@ -24,7 +24,7 @@ let version='old',signedIn=true;
  const dialog=index.slice(index.indexOf('<dialog id="dialog"'),index.indexOf('</body>'));
  assert.ok(header.includes('id="account-button"')&&dialog.includes('id="apply-update"'));
  function icon(name){return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;}
- function html(base){return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${base}/assets/app.css"><script type="module" src="${base}/assets/app.js"></script></head><body data-base="${base}" data-initial-view="market" data-csrf="fixture">${svg}<aside class="sidebar"><a class="brand">Piscina</a><nav>${['market','pool','dashboard','pending'].map(v=>`<a class="nav-link" data-view="${v}">${v}</a>`).join('')}<a id="admin-link" hidden></a></nav><div class="sidebar-bottom"><button class="install-btn" data-action="install">Instalar app</button></div></aside><div class="app-shell">${header}<div id="environment-banner" hidden></div><div id="offline-banner" hidden></div><main id="main"></main></div><nav class="mobile-nav">${[['market','Explorar'],['pool','Piscina'],['dashboard','Portfólio'],['pending','Pendências']].map(([v,label])=>`<a data-view="${v}" href="${base}/index.php?view=${v}">${icon('grid')}<span>${label}</span></a>`).join('')}</nav>${dialog}</body></html>`;}
+ function html(base){return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="${base}/assets/app.css"><link rel="stylesheet" href="${base}/assets/home-hero.css"><script type="module" src="${base}/assets/app.js"></script></head><body data-base="${base}" data-initial-view="market" data-csrf="fixture">${svg}<aside class="sidebar"><a class="brand">Piscina</a><nav>${['market','pool','dashboard','pending'].map(v=>`<a class="nav-link" data-view="${v}">${v}</a>`).join('')}<a id="admin-link" hidden></a></nav><div class="sidebar-bottom"><button class="install-btn" data-action="install">Instalar app</button></div></aside><div class="app-shell">${header}<div id="environment-banner" hidden></div><div id="offline-banner" hidden></div><main id="main"></main></div><nav class="mobile-nav">${[['market','Explorar'],['pool','Piscina'],['dashboard','Portfólio'],['pending','Pendências']].map(([v,label])=>`<a data-view="${v}" href="${base}/index.php?view=${v}">${icon('grid')}<span>${label}</span></a>`).join('')}</nav>${dialog}</body></html>`;}
  const server=http.createServer(async(req,res)=>{
   try{
    const url=new URL(req.url,'http://localhost');
@@ -52,7 +52,7 @@ let version='old',signedIn=true;
    }
    if(!/^\/(assets|icons)\/[\w.-]+$/.test(rel)&&rel!=='/offline.html'){res.writeHead(404);res.end();return;}
    const data=await fs.readFile(path.join(root,'public',rel.slice(1)));
-   const ext=path.extname(rel);res.setHeader('Content-Type',({'.css':'text/css','.js':'text/javascript','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2','.html':'text/html'})[ext]||'application/octet-stream');res.end(data);
+   const ext=path.extname(rel);res.setHeader('Content-Type',({'.css':'text/css','.js':'text/javascript','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.woff2':'font/woff2','.html':'text/html'})[ext]||'application/octet-stream');res.end(data);
   }catch(e){res.writeHead(500);res.end(String(e));}
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));

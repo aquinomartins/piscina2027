@@ -12,6 +12,8 @@ FILES = (
 
 
 def main():
+    if (ROOT / 'app/Galeria.php').exists():
+        raise SystemExit('Use tools/build-galeria-update.py: os pacotes anteriores não contêm as dependências da Galeria.')
     if (ROOT / 'app/AdminDanger.php').exists():
         raise SystemExit('Use tools/build-danger-update.py: o pacote administrativo antigo não contém as novas dependências.')
     payload = {name: (ROOT / name).read_bytes() for name in FILES}
