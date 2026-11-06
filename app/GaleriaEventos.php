@@ -7,6 +7,7 @@ final class GaleriaEventos {
     public function event(int $id): array {return $this->g->db->row('SELECT * FROM galeria_events WHERE id=? FOR UPDATE',[$id])??throw new Problem('Evento não encontrado.',404);}
     public function save(int $actor,array $d): array {
         $this->g->admin($actor,$d);$title=GaleriaInput::text($d['title']??null,120);
+        if(empty($d['event_id']))$this->g->feature('events');
         $start=GaleriaInput::date($d['voting_starts']??null);$end=GaleriaInput::date($d['voting_ends']??null);if($start<=$this->g->now||$end<=$start||(new \DateTimeImmutable($end))->getTimestamp()-(new \DateTimeImmutable($start))->getTimestamp()>31*86400)throw new Problem('Janela de votação futura e com até 31 dias.');
         $capacity=GaleriaInput::integer($d['capacity']??4,2,32);$hours=GaleriaInput::integer($d['review_hours']??24,0,168);$resolution=GaleriaInput::integer($d['resolution_hours']??24,1,168);
         $asset=$d['prize_asset']??'';$amount=GaleriaInput::money($d['prize']??null,$asset);

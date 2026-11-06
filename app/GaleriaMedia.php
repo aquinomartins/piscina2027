@@ -18,6 +18,12 @@ final class GaleriaMedia {
         if(!Galeria::installed($this->domain->db))throw new Problem('Mídia indisponível.',404);
         if(isset($q['photo_id'])){$r=$this->domain->db->row('SELECT p.path,f.status FROM galeria_photos p JOIN galeria_frames f ON f.id=p.frame_id WHERE p.id=?',[Domain::id($q['photo_id'])]);if(!$r)throw new Problem('Mídia indisponível.',404);if($r['status']==='DRAFT'){if(!$viewer)throw new Problem('Mídia indisponível.',404);$this->domain->admin($viewer);}$path=$r['path'];$dir='galeria';}
         elseif(isset($q['candidate_id'])){$r=$this->domain->db->row('SELECT c.snapshot,c.state,e.state event_state FROM galeria_candidates c JOIN galeria_events e ON e.id=c.event_id WHERE c.id=?',[Domain::id($q['candidate_id'])]);if(!$r||$r['snapshot']===null||$r['state']!=='VALID'||!in_array($r['event_state'],['PREPARED','VOTING','REVIEW','FINALIZED','SETTLED'],true))throw new Problem('Exposição indisponível.',404);$t=GaleriaInput::decode($r['snapshot']);$path=$t['image']['image_path'];$dir='images';}
+        elseif(isset($q['link_id'])&&MolduraLinks::installed($this->domain->db)){
+            $r=$this->domain->db->row("SELECT a.terms,n.* FROM galeria_links a JOIN nfts n ON n.id=a.nft_id JOIN galeria_frames f ON f.id=a.frame_id WHERE a.id=? AND a.state='ACTIVE' AND n.state='PRIVATE' AND n.owner_id=a.nft_user AND f.holder_id=a.frame_user",[Domain::id($q['link_id'])]);
+            if(!$r)throw new Problem('Associação indisponível.',404);$t=GaleriaInput::decode($r['terms']);
+            if(NftImage::version($r)!==$t['image']['version'])throw new Problem('Imagem alterada.',404);
+            $path=$t['image']['image_path'];$dir='images';
+        }
         else throw new Problem('Mídia não encontrada.',404);
         if(!preg_match('/^[a-f0-9]{32}(?:-thumb)?\.jpg$/D',$path))throw new Problem('Mídia inválida.',404);$file=$this->domain->config['storage'].'/'.$dir.'/'.$path;if(!is_file($file))throw new Problem('Mídia indisponível.',404);return $file;
     }

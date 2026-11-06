@@ -11,6 +11,7 @@ final class Coalizoes {
     }
     private function terms(int $actor,array $d,?array $old=null): array {
         $this->g->newBusiness();GaleriaInput::confirmed($d);if(($d['license_confirm']??false)!==true)throw new Problem('Confirme a autorização de exibição e histórico da imagem.');
+        if($old===null)$this->g->feature('physical');
         $frame=Domain::id($d['frame_id']??$old['frame_id']??null);$nft=Domain::id($d['nft_id']??$old['nft_id']??null);
         $from=GaleriaInput::date($d['starts_at']??null);$to=GaleriaInput::date($d['ends_at']??null);$expires=GaleriaInput::date($d['expires_at']??null);
         $limit=(new \DateTimeImmutable($this->g->now))->modify('+7 days')->format('Y-m-d H:i:s.u');
@@ -21,10 +22,11 @@ final class Coalizoes {
         $frameUser=$this->g->user($fu);$nftUser=$this->g->user($nu);$n=$this->nft($nft,$nu);
         $policy=$this->g->db->row('SELECT * FROM galeria_policies WHERE id=?',[Domain::id($d['policy_id']??null)])??throw new Problem('Configure uma política de cotas antes da proposta.',409);
         if($policy['space_id']!==$f['space_id']||$policy['type_key']!==$f['type_key'])throw new Problem('Política não corresponde ao espaço/tipo.',409);$this->g->user((int)$policy['recipient_id']);
+        if($old===null&&$policy['x']!=='0')$this->g->feature('share_charges');
         $np=Exact::units($d['nft_percent']??null,2,true);$fp=Exact::units($d['frame_percent']??null,2,true);
         if(bcadd($np,$fp,0)!=='10000'||bccomp($np,'10000',0)>0)throw new Problem('Percentuais de 0 a 100%, duas casas, somando exatamente 100%.');
         $event=null;$eventRules=null;$eventPrize=null;
-        if(!empty($d['event_id'])){$e=(new GaleriaEventos($this->g))->event(Domain::id($d['event_id']));if($e['state']!=='REGISTRATION'||$from>$e['voting_starts']||$to<$e['voting_ends'])throw new Problem('Inscrição fechada ou exposição não cobre a votação.',409);$event=$e['id'];$eventRules=GaleriaInput::decode($e['rules']);$eventPrize=['amount'=>$e['prize_amount'],'asset'=>$e['prize_asset'],'funds_state'=>$e['funds_state'],'title'=>$e['title']];}
+        if(!empty($d['event_id'])){if($old===null)$this->g->feature('events');$e=(new GaleriaEventos($this->g))->event(Domain::id($d['event_id']));if($e['state']!=='REGISTRATION'||$from>$e['voting_starts']||$to<$e['voting_ends'])throw new Problem('Inscrição fechada ou exposição não cobre a votação.',409);$event=$e['id'];$eventRules=GaleriaInput::decode($e['rules']);$eventPrize=['amount'=>$e['prize_amount'],'asset'=>$e['prize_asset'],'funds_state'=>$e['funds_state'],'title'=>$e['title']];}
         $location=$this->g->db->row('SELECT s.name space_name,s.address,p.name point_name FROM galeria_points p JOIN galeria_spaces s ON s.id=p.space_id WHERE p.id=?',[$f['point_id']]);
         return ['location'=>$location,'frame_id'=>(string)$frame,'nft_id'=>(string)$nft,'frame_user'=>(string)$fu,'nft_user'=>(string)$nu,'point_id'=>$f['point_id'],'space_id'=>$f['space_id'],
             'frame_user_name'=>$frameUser['display_name'],'nft_user_name'=>$nftUser['display_name'],'creator_name'=>$this->g->db->row('SELECT display_name FROM users WHERE id=?',[$n['creator_id']])['display_name'],'frame_name'=>$f['name'],'frame_authority'=>$f['authority_id'],'frame_version'=>$f['version'],'frame_metadata'=>GaleriaInput::decode($f['metadata']),
@@ -69,6 +71,7 @@ final class Coalizoes {
         if($t['event_id']!==null){$e=(new GaleriaEventos($this->g))->event((int)$t['event_id']);if($e['state']!=='REGISTRATION'||$e['voting_starts']<=$this->g->now)throw new Problem('Evento já fechou inscrições.',409);if((int)$this->g->db->row("SELECT COUNT(*) n FROM galeria_candidates WHERE event_id=? AND state='VALID'",[$e['id']])['n']>=(int)$e['capacity'])throw new Problem('Capacidade do evento esgotada.',409);if($this->g->db->row('SELECT id FROM galeria_candidates WHERE event_id=? AND frame_id=?',[$e['id'],$p['frame_id']]))throw new Problem('Esta Moldura já participou da inscrição no evento.',409);}
         $this->g->db->run('INSERT IGNORE INTO galeria_acceptances(proposal_id,version,user_id,created_at) VALUES(?,?,?,?)',[$p['id'],$p['current_version'],$actor,$this->g->now]);
         if((int)$this->g->db->row('SELECT COUNT(*) n FROM galeria_acceptances WHERE proposal_id=? AND version=?',[$p['id'],$p['current_version']])['n']<2)return ['proposal_id'=>$p['id'],'state'=>'PENDING'];
+        if(MolduraLinks::installed($this->g->db)&&$this->g->db->row('SELECT id FROM galeria_links WHERE active_frame=? OR active_nft=? LIMIT 1',[$f['id'],$p['nft_id']]))throw new Problem('Há uma associação simples vigente. Encerre-a com o consentimento das partes.',409);
         if($this->g->db->row("SELECT id FROM galeria_agreements WHERE state IN ('RESERVED','EXHIBITING','SUSPENDED') AND (frame_id=? OR point_id=? OR nft_id=?) AND starts_at<? AND ends_at>? LIMIT 1",[$f['id'],$t['point_id'],$p['nft_id'],$t['ends_at'],$t['starts_at']]))throw new Problem('Moldura, ponto ou NFT já reservado nesse intervalo.',409);
         $this->g->db->run('INSERT INTO galeria_agreements(proposal_id,version,frame_id,nft_id,point_id,space_id,frame_user,nft_user,recipient_id,event_id,starts_at,ends_at,x,nft_bps,policy_id,terms,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$p['id'],$p['current_version'],$p['frame_id'],$p['nft_id'],$t['point_id'],$t['space_id'],$p['frame_user'],$p['nft_user'],$t['recipient_id'],$t['event_id'],$t['starts_at'],$t['ends_at'],$t['x'],$t['nft_bps'],$t['policy_id'],$p['terms'],$this->g->now]);
         $id=(int)$this->g->db->pdo->lastInsertId();$a=$this->agreement($id);$this->g->finance->hold($a);

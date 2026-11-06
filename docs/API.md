@@ -102,6 +102,45 @@ A ativação não escolhe primeiro corte. Parâmetros geram novas versões, sem 
 
 ## Galeria / Molduras
 
+O modo padrão passa a ser simples depois da migração 005. As rotas avançadas
+abaixo continuam disponíveis para histórico/resolução; novas operações avançadas
+respeitam as opções de disponibilidade do Admin. Nenhuma opção adiciona cobrança
+ou agendamento às rotas `galeria.link.*`.
+
+| Método / ação simples | Campos / comportamento |
+|---|---|
+| GET galeria.simple.mine | Sessão; `offset`, Molduras, ofertas exclusivas, propostas, acordos e negociações próprios |
+| GET galeria.simple.admin | Admin; `offset`, proprietários, anúncios e associações separados |
+| GET galeria.people | Aprovado ou Admin; `q`, `offset`; ID/nome de participantes elegíveis, sem e-mail |
+| GET galeria.assets | Aprovado ou Admin; `q`, `owner_id`, `offset`; NFTs privadas elegíveis e seus donos |
+| GET galeria.link.proposal | `id`; somente partes e Admin; versões, aceites e acordo, sem caminhos privados |
+| POST admin.galeria.frame.quick | `name`; `description` opcional; `sale_mode=draft/public/direct`; preço/moeda para venda e `buyer_id` para exclusiva; senha e confirmação |
+| POST galeria.link.preview | `frame_id`, `nft_id`, `frame_percent`, `nft_percent`, `conditions` opcional, `confirm`, `license_confirm`; retorna termos e `preview_hash` |
+| POST galeria.link.propose / counter | Termos da prévia, `preview_hash`, `expires_at` retornado; contraproposta exige `link_proposal_id` e `version` |
+| POST galeria.link.accept | `link_proposal_id`, `version`, `terms_hash`, `confirm`, `license_confirm`; revalida dono/ativo/percentuais |
+| POST galeria.link.reject / cancel | `link_proposal_id`, `version`, `confirm`; cancelar exige autoria de uma versão |
+| POST galeria.link.end | `link_id`, `confirm`; duas partes diferentes confirmam o encerramento; mesmo dono confirma uma vez |
+| POST admin.galeria.link.resolve | Admin, senha, motivo, `link_id`, `confirm`; resolução excepcional de associação suspensa |
+| POST admin.galeria.features | Admin, senha, motivo, `confirm`; booleanos `physical`, `events`, `share_charges` |
+
+Todas as mutações mantêm CSRF/idempotência. Propostas de associação valem até
+sete dias; o prazo padrão vem do servidor, e o cliente devolve o valor exato da
+prévia. Isso não é agendamento da associação. Seus termos incluem
+`rules_version=1`, modalidade, percentuais, participantes e ausência de cobrança.
+O modo de mesmo proprietário é confirmado diretamente ao propor, sem simular
+dois aceites da mesma conta. Nenhum pagamento opcional de associação é aceito.
+
+Ofertas de Moldura aceitam `buyer_id` e vencimento omitido (`expires_at=NULL`).
+Uma oferta não autoriza débito do destinatário. `galeria.buy` conserva preço,
+versão, vendedor e sessão como autoridade do pagamento. Oferta exclusiva só é
+consultável pelo comprador, vendedor ou Admin e só pode ser comprada pelo alvo.
+Compra/revenda fica bloqueada por associação vigente até o encerramento aceito;
+não cancela ou transfere beneficiários silenciosamente. Alterações canônicas da
+NFT podem suspender o vínculo, sem reescrever seus termos.
+
+`galeria-media.php?link_id=ID` serve a imagem aceita somente para associação
+ativa e com autoridade/mídia válidas. Mídia continua fora do cache público.
+
 Migração 004 obrigatória. `galeria.enabled=false` por padrão; o servidor bloqueia
 novos negócios mesmo se um cliente enviar comandos diretamente. Suspensão de
 novas contratações preserva consultas e resolução dos compromissos existentes.

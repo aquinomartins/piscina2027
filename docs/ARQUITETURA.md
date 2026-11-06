@@ -77,6 +77,21 @@ controles distintos. Após haver compromissos, suspende-se a entrada e mantém-s
 o código para resolução; não se restaura um overlay antigo incompatível.
 Guia e decisões econômicas: [GALERIA.md](GALERIA.md).
 
+A migração 005 acrescenta o protocolo de associação simples separado das tabelas
+de contratos físicos. Não coloca valores fictícios nos campos obrigatórios da
+004 nem converte contratos antigos. Novas Molduras têm metadados de ativo
+(`schema_version=2, mode=asset`) sem equipamento/local obrigatório. As ofertas
+usam as mesmas tabelas e o mesmo ledger; apenas o vencimento passa a ser anulável.
+
+`MolduraLinks` usa gate, propriedade, versões, consentimentos e idempotência
+existentes, sem chamar cobrança, reserva ou emissão. Índices únicos sobre os
+vínculos ativos protegem simultaneamente Moldura e NFT. Mesmo dono usa um aceite;
+partes distintas aceitam a mesma versão. Venda aguarda encerramento consensual.
+Mudança de autoridade suspende sem apagar o acordo; imagens do histórico são
+retidas. `galeria_features` controla disponibilidade futura, enquanto cada
+contrato mantém seus termos versionados. As opções não alteram retroativamente
+um contrato nem tornam o modo simples oneroso.
+
 ## Imutabilidade e reconciliação
 
 A aplicação não oferece UPDATE/DELETE de lançamentos, eventos ou versões concluídas. Runtime SQL deve ter SELECT/INSERT no livro; migração usa credencial temporária com DDL. Administração não tem editor de saldo/propriedade. Reconciliação sob o gate compara agregados com lançamentos, soma por transação/ativo, negativos indevidos, reservas fungíveis/NFT, custódia e reservas de distribuição com direitos pendentes. DBA com privilégios totais ainda pode alterar o banco: isso não é imutabilidade criptográfica. Correções requerem serviço/migração de compensação auditada, nunca apagar o histórico.

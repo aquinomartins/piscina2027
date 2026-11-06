@@ -1,138 +1,147 @@
-# Galeria — verificação executada e demonstração
+# Galeria — testes da simplificação de 06/11/2026
 
-Verificação local em 31/10/2026, com dados sintéticos isolados. PHP **8.3.36**,
-MySQL/InnoDB **8.0.46**, BCMath/GD/PDO MySQL e Chromium **151** por Playwright.
-Não houve teste de carga, implantação ou execução de SQL na produção da
-Superdomínios. MariaDB e a configuração da hospedagem não foram verificados.
+Verificação local com dados sintéticos isolados: PHP **8.3.36**, MySQL/InnoDB
+**8.0.46**, GD/BCMath/PDO MySQL e Chromium **151**, por Playwright. Não houve
+implantação, SQL, SMTP externo ou teste de carga na hospedagem de produção.
+MariaDB e outros navegadores móveis não foram verificados nesta entrega.
 
-## Resultados
+## Resultado executado
 
-| Execução | Resultado |
+| Verificação | Resultado |
 |---|---|
-| Linha de base, antes da integração | 63 cenários de domínio e 19 de autenticação, zero falhas |
-| Regressão integrada com Galeria ligada | 90 cenários: 63 antigos + 27 da Galeria, zero falhas |
-| Galeria, após os três últimos casos adicionados | 30 cenários, zero falhas |
-| Jogo anterior com flag privada da Galeria falsa | 63 cenários, zero falhas |
-| Interface/API reais, catálogo/Admin/negociação | 12 grupos na raiz + 12 em `/piscina`, aprovados |
-| Interface/API reais, evento/votação | 5 grupos na raiz + 5 em `/piscina`, aprovados |
-| Jornadas anteriores no navegador | 17 grupos do app, 7 da troca de imagem, 8 da Danger Zone, aprovados |
-| PWA: instalação/atualização explícita | 6 grupos, raiz e subpasta, aprovados também após os últimos ajustes |
-| Upgrade 003 → 004, reaplicada duas vezes | 31 tabelas antigas preservadas integralmente; carteira/NFT de teste intactas |
-| Demonstrações CLI: vencedor e empate | Prêmio exato de mR$ 1.000,00 em cada execução; sem duplicação |
-| Conciliação após demonstração | Todas as seções canônicas e da Galeria vazias |
-| Sintaxe e integridade | PHP, JS, CRC/conteúdo dos ZIPs e `git diff --check` conferidos |
+| Suíte integrada de domínio | **113 cenários, zero falhas**: 63 anteriores + 30 da Galeria avançada + 20 simples |
+| UX simples / API real | **11 grupos na raiz e 11 em `/piscina`**, aprovados |
+| Fluxo avançado original / API real | 12 grupos de catálogo/Admin/negociação, aprovados |
+| Evento/votação original | 5 grupos na raiz e 5 em subpasta, aprovados |
+| Jornadas anteriores do app | 17 grupos, aprovados |
+| Troca de imagem Admin | 7 grupos, aprovados |
+| Danger Zone | 8 grupos, aprovados |
+| Menu de instalação/atualização do PWA | 6 grupos, raiz/subpasta, aprovados |
+| Upgrade 004 → 005 reaplicado duas vezes | **59 tabelas anteriores preservadas**, recursos em stand-by e conciliação vazia |
+| Sintaxe / distribuição | PHP/JS, `git diff --check`, CRC/conteúdo e hashes dos ZIPs conferidos |
 
-A execução completa de 90 precedeu três casos adicionais de confirmação
-administrativa e alteração de condições físicas. A suíte focada final contém
-os 30 casos e passou, assim como a interface real de negociação na raiz e em
-subpasta. Não se apresenta essa sequência como uma execução completa de 93.
+Logs resumidos: [RESULTADOS_GALERIA.txt](RESULTADOS_GALERIA.txt).
 
-O resumo textual dos resultados está em
-[RESULTADOS_GALERIA.txt](RESULTADOS_GALERIA.txt). Os testes executáveis e o
-gerador de demonstração estão em `tests/galeria-*`, no pacote completo.
+A regressão detectou uma venda por valor zero usada legitimamente no fluxo
+avançado original. Esse comportamento foi preservado para os ativos anteriores;
+a compra de uma nova Moldura simples continua exigindo preço positivo. O fluxo
+Admin também foi conferido pela entrada real **Gerenciar Galeria**, que agora
+abre a administração simples, com o painel original na área opcional.
 
-## Riscos cobertos
+## O que os 20 casos novos cobrem
 
-- Flag desligada/suspensão, permissões por objeto, CSRF, senha Admin, versões,
-  valores manipulados, saldo insuficiente e autorizações expiradas.
-- Corridas reais com processos e conexões independentes: compra da mesma
-  Moldura, agenda, uso concorrente das mesmas cotas, duplicação de voto e
-  encerramento simultâneo com votação. O gate e as transações são os existentes.
-- X = 2 por parte, 16 cotas totais para quatro coalizões. Reserva canônica
-  vinculada ao usuário, Q/direitos originais preservados, captura/devolução sem
-  emissão, destruição, saldo negativo ou cobrança parcial.
-- Proposta, contraproposta e dois aceites da mesma versão. Revenda bilateral
-  pela interface, preço exato, propriedade e pagamento atômicos; mudanças de
-  local/condições cancelam ofertas antigas e exigem novo consentimento.
-- NFT pública inelegível e normalmente retirável; venda, depósito ou mudança
-  de mídia suspendem a exposição afetada. A imagem votada não é remapeada nem
-  apagada pela limpeza de uploads. Exclusão do usuário encaminha à custódia.
-- Mínimo, infraestrutura e prêmio integralmente financiados antes de votar;
-  credenciamento único, partes interessadas recusadas e ausência de parciais
-  públicas ou dados pessoais do eleitor no catálogo.
-- Revisão versionada, invalidar voto com motivo, empate, zero votos, resíduos,
-  prazo de revisão, repetição de liquidação e incidente depois do pagamento.
-- Ranking definitivo, empate denso, filtro de espaço histórico e conservação
-  dos beneficiários após revenda/arquivamento. Ocupação com horas prospectivas
-  efetivamente registradas e manutenção descontada.
-- Resposta perdida **depois do commit**, recuperação de recibo sem reenviar
-  compra; compatibilidade da consulta com o PWA anterior. Atualização bloqueada
-  durante operação pendente. Cache contém somente estáticos autorizados.
+- Criação pelo Admin só com nome, sem fotografia, ponto, local, agenda ou cotas.
+- Preço positivo para novas Molduras simples; saldo insuficiente não transfere
+  nem cobra parcialmente. Uma oferta não debita o destinatário.
+- Oferta exclusiva sem preço exposto a terceiro; somente o destinatário compra.
+- Compra concorrente com processos/conexões independentes; uma entrega e um
+  pagamento. Recibos/cliques repetidos não duplicam operação.
+- Dono da Moldura escolhendo NFT de outra pessoa e dono da NFT iniciando proposta.
+- Contraproposta com percentuais livres, nova versão e dois aceites exatos.
+  Proponente pode cancelar; terceiro não negocia em nome das partes.
+- Mesmo dono confirmando a vinculação diretamente, sem duas pessoas fictícias.
+- 0%/100% permitidos; negativos, mais de duas casas e soma diferente de 100%
+  recusados. Não há porcentagem mínima imposta.
+- Conclusão com **zero cotas disponíveis**, sem reserva ou lançamento de cobrança.
+- Corridas reais: a mesma Moldura ou a mesma NFT só entra em uma associação
+  vigente; propriedade é revalidada na conclusão de propostas.
+- Revenda pode ser anunciada durante associação, mas sua conclusão aguarda o
+  encerramento consensual. Termos e beneficiários antigos não são substituídos.
+- Depósito nativo continua funcionando e suspende o vínculo incompatível;
+  termos, mídia referenciada e histórico são preservados.
+- Consulta/resolução com novas contratações pausadas. Ativar recursos futuros
+  não modifica acordos simples nem cria débito.
+- Proposta física anterior continua operável sob sua regra de X cotas, mesmo
+  com os novos recursos em stand-by, sem conversão ou recobrança.
 
-Catálogo/Admin: larguras 320, 360, 390, 412, 700, 701, 768, 1024 e 1440 px,
-sem rolagem horizontal. A votação também foi exercitada em 320 px. As duas
-instalações usaram o PHP/API reais, com bancos de demonstração recriados entre
-jornadas; apenas o teste específico do menu PWA usa API simulada.
+## Interface e regressões
 
-## Reproduzir com segurança
+A interface real foi exercitada em **320, 360, 390, 412, 700, 701, 768, 1024 e
+1440 px**, sem rolagem horizontal no catálogo. Admin/acordos também foram
+verificados em celular. Criação mínima, busca de participantes/NFTs, oferta
+exclusiva, revisão de compra, contraproposta 30/70 → 40/60, aceite, encerramento
+e vinculação direta foram executados pela interface.
 
-Use um ambiente local e **exclusivamente** `environment=demo` e
-`dbname=piscina_test`, em um MySQL isolado. A suíte `tests/run.php` apaga e
-recria as tabelas desse banco. Não use credenciais nem cópia operacional da
-hospedagem. Configure `PISCINA_CONFIG` para um arquivo privado, armazenamento
-e sessões de teste, `galeria.enabled=true` e `mail_transport=file`.
+A compra simula perda da resposta **após o commit** e recupera o recibo sem
+novo débito. A área avançada continua funcionando, inclusive QR/votação,
+revisão/premiação, troca de imagem, Danger Zone, recuperação de senha, calendário,
+carteiras e negociação nativa. O painel avançado também recebe Molduras simples
+sem mostrar dimensões/local fictícios ou valores `undefined`.
+
+As jornadas da Galeria usam API/PHP/MySQL reais. Somente o teste específico do
+menu PWA usa API simulada, com service workers reais. O cache contém estáticos,
+sem carteiras, API, votos ou mídia dinâmica. Instalação/atualização permanecem
+explícitas, com operações pendentes protegidas.
+
+## Prova de atualização do banco
+
+`tests/molduras-simples-upgrade.php` cria um banco local separado vazio,
+`piscina_molduras_upgrade`, com 001–004. Semeia usuários/NFT reais de teste,
+carteiras, Moldura física vendida, oferta com prazo, política X = 2 e proposta
+pendente. Calcula hashes de todas as linhas das 59 tabelas anteriores (exceto o
+registro de migrações), aplica a 005 **duas vezes** e compara os hashes.
+
+Resultado: linhas anteriores intactas, recursos novos em stand-by e listas de
+conciliação vazias. A alteração de nulabilidade de `galeria_offers.expires_at`
+não modifica valores existentes. Não há datas, pontos ou espaços artificiais
+para viabilizar contratos novos.
+
+## Reproduzir em desenvolvimento
+
+Use **exclusivamente** `environment=demo` e `dbname=piscina_test`, num MySQL
+isolado. A suíte de domínio apaga e recria todas as tabelas desse banco. Defina
+`PISCINA_CONFIG` para configuração/armazenamento/sessões privados de teste,
+`galeria.enabled=true`, `mail_transport=file`. Não use a configuração da conta
+operacional da Superdomínios.
 
 ```sh
 php tests/run.php
 # Subconjunto focado, também destrutivo no banco descartável:
-PISCINA_TEST_FILTER=Galeria php tests/run.php
-php tests/auth-limits.php
+PISCINA_TEST_FILTER='Molduras simples:' php tests/run.php
 ```
 
-Para demonstrar um evento completo, prepare outra vez um `piscina_test`
-**vazio**. O gerador exige `PISCINA_DEMO_ADMIN_PASSWORD` e
-`PISCINA_DEMO_PASSWORD` definidos privadamente, com pelo menos 12 caracteres.
-Não tem senha de fábrica e se recusa a apagar registros existentes.
+Para o navegador, prepare novamente um `piscina_test` vazio e defina privadamente
+`PISCINA_DEMO_ADMIN_PASSWORD` e `PISCINA_DEMO_PASSWORD`, com ao menos 12 caracteres.
+O gerador abaixo recusa banco preenchido e não apaga registros:
 
 ```sh
-php tests/galeria-demo.php --win > demonstracao-vencedor.json
-# Em outro banco vazio, com a mesma configuração isolada:
-php tests/galeria-demo.php --tie > demonstracao-empate.json
-php bin/reconcile.php
+php tests/molduras-simples-demo.php > fixture-simples.json
+# Em outro terminal, com a mesma configuração privada:
+php -S localhost:8146 -t public
+# Com TEST_URL e GALERIA_FIXTURE apontando para servidor/JSON locais:
+node tests/molduras-simples-browser.cjs
 ```
 
-Cada caso cria quatro Molduras, quatro coalizões e X = 2 por parte. Somente a
-fixture aumenta o crédito inicial para viabilizar as jornadas, gera imagens
-sintéticas e avança o relógio da sessão MySQL. O Admin de produção não ganha
-esses recursos. A soma de 16 cotas é separada do prêmio MR financiado com
-receita primária existente.
+`TEST_URL` é a origem e `TEST_BASE_PATH` é vazio ou `/piscina`. Na subpasta,
+configure os mesmos valores no PHP e sirva `public/` nesse caminho. Configure
+`TEST_ARTIFACTS` e `CHROMIUM_PATH` se necessário. O teste exige as duas senhas da
+fixture no ambiente e usa somente os participantes sintéticos aprovados.
 
-No caso vencedor, a primeira candidatura recebe os 1.000: NFT 600 e Moldura
-400, conforme 60%/40%. No empate, cada uma das duas candidaturas recebe 500:
-a primeira divide 300/200 e a segunda, com 45%/55%, divide 225/275. As quatro
-participações cumpridas são capturadas independentemente de vitória.
-
-Para navegador, `--ui` gera catálogo/propostas para negociar e `--live` prepara
-votação aberta com eleitor de demonstração. Use banco vazio em cada modo.
-Execute o PHP local servindo `public/`; para subpasta, sirva-o em `/piscina`
-e configure `url`/`base_path` correspondentes. Exporte `TEST_URL` com a origem
-e `TEST_BASE_PATH` com `''` ou `/piscina`, as duas senhas e
-`CHROMIUM_PATH` quando necessário. Grave a saída do gerador no caminho de
-`GALERIA_FIXTURE` e execute:
+Para o upgrade, o usuário MySQL local precisa poder criar o banco separado
+**vazio** `piscina_molduras_upgrade`:
 
 ```sh
-GALERIA_BROWSER_MODE=ui node tests/galeria-browser.cjs
-# Repita com fixture --live e GALERIA_BROWSER_MODE=live.
-npm run test:pwa
+php tests/molduras-simples-upgrade.php
 ```
 
-`tests/galeria-upgrade.php` exige a mesma configuração local e permissão de
-criar um banco **vazio** `piscina_galeria_upgrade_test`. Semeia 001–003 com um
-usuário/NFT sintéticos, calcula hashes de todas as linhas antigas, aplica a
-004 duas vezes e compara o resultado. Não apaga esse banco para reutilizá-lo.
+A demonstração avançada anterior permanece em `tests/galeria-demo.php`, com os
+casos `--win` e `--tie` de quatro coalizões, 16 cotas e prêmio de mR$ 1.000.
+A cobrança e as funções originais continuam cobertas pelos 30 testes avançados.
+O novo gerador simples usa a concessão nativa de mR$ 1.600 e não emite cotas.
 
 ## Prévias reais da demonstração
 
-![Catálogo mobile, com dados sintéticos](images/galeria-catalogo-mobile.png)
+![Molduras à venda no celular](images/molduras-simples-mobile.png)
 
-![Administração da Galeria no desktop](images/galeria-admin-desktop.png)
+![Acordo com proprietários e percentuais no celular](images/molduras-acordo-mobile.png)
 
-![Evento e votação em celular](images/galeria-evento-mobile.png)
+![Administração simples no desktop](images/molduras-admin-desktop.png)
 
-## Limites da validação
+## Limites
 
-Não foi medido throughput da hospedagem compartilhada. A consistência foi
-testada sob corridas independentes, mas a capacidade de uma turma depende do
-plano/cron/PHP/MySQL do servidor final. Credenciamento e confirmação física
-continuam sendo verificações humanas. Não foi testado SMTP externo nem
-comportamento de instalação em todos os navegadores móveis nesta entrega.
+Não foi medido throughput do plano de hospedagem ou feito teste remoto com a
+turma. Associação simples registra a parceria e os percentuais, sem prêmio
+ou receita automática; participar de um evento avançado requer termos próprios,
+consentimento e financiamento. Verificações físicas continuam humanas quando
+esse recurso for utilizado. A produção depende da instalação da 005 e dos
+arquivos compatíveis; não foi alterada por estes testes.

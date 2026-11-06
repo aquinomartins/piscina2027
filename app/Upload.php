@@ -43,6 +43,7 @@ final class Upload {
             foreach($r as $path)if(is_string($path)&&preg_match('/^[a-f0-9]{32}(?:-thumb)?\.jpg$/D',$path))$associated[$path]=true;
         }
         if(Galeria::installed($this->domain->db))foreach($this->domain->db->all("SELECT JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.image_path')) p,JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.thumbnail_path')) t FROM galeria_agreements") as $r)foreach($r as $path)if(is_string($path))$associated[$path]=true;
+        if(MolduraLinks::installed($this->domain->db))foreach($this->domain->db->all("SELECT JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.image_path')) p,JSON_UNQUOTE(JSON_EXTRACT(terms,'$.image.thumbnail_path')) t FROM galeria_links") as $r)foreach($r as $path)if(is_string($path))$associated[$path]=true;
         foreach(glob($dir.'/*.jpg') as $file) {if(filemtime($file)>time()-86400) continue;$name=basename($file);if(!isset($associated[$name])) {unlink($file);$count++;}}
         return $count;
     }

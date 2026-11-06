@@ -1,8 +1,9 @@
 # Integração Galeria / Moldura
 
-Base: PR #9 integrada e banner da PR #10 (`d6abf08`). A PR #10 ainda estava
-aberta ao iniciar este módulo. A Galeria será proposta sobre essa branch para
-preservar o banner e permitir revisão independente. Nenhuma implantação externa.
+Base: PR #9 integrada, banner da PR #10 e Galeria original da PR #11.
+A PR #11 foi incorporada à branch `feat/home-ilustrada`; a PR #10 permanece
+aberta para `main`. A simplificação usa essa árvore de código, idêntica à base
+validada da Galeria, em branch própria. Nenhuma implantação externa.
 
 PHP 8.3, PDO MySQL/InnoDB, BCMath, GD, JS sem framework. Toda mutação econômica
 existente passa por `Domain::operation`, transação com repetição limitada e
@@ -41,3 +42,27 @@ dos contratos existentes. A flag privada começa falsa em produção.
 Linha de base e resultados efetivamente executados estão em
 [GALERIA_TESTES.md](GALERIA_TESTES.md), incluindo regressão e corridas com
 conexões independentes. `Auth.php` e `Periods.php` permanecem idênticos à base.
+
+## Simplificação de 06/11/2026
+
+A exigência de agenda/local estava nos formulários de `galeria.js`, em
+`Coalizoes::terms`/`Molduras::operational` e nos campos NOT NULL dos acordos
+físicos da 004. Retirar somente os inputs não resolveria a obrigatoriedade.
+O fluxo de associação original já verificava as duas partes no servidor, mas
+a seleção de NFTs da interface dificultava iniciar uma parceria com terceiros.
+
+O modo padrão agora usa `MolduraLinks`, com versões, dois aceites (ou confirmação
+direta de mesmo dono), gate e idempotência canônicos. Tabelas próprias da 005
+representam o novo tipo de contrato sem forjar espaços, datas ou políticas.
+Não há nova carteira. Compra e revenda reutilizam `Molduras`, `MolduraTrades`,
+ofertas/vendas e `GaleriaFinance` existentes. Oferta exclusiva aproveita o
+`buyer_id` já presente; o único ajuste em coluna anterior é permitir vencimento
+nulo nas ofertas. Nenhuma linha histórica é convertida.
+
+As opções de `galeria_features` começam indisponíveis para novos contratos
+avançados, mas não reescrevem propostas/contratos anteriores. Disponibilizar um
+recurso não o torna obrigatório no protocolo simples, cujos termos gravam
+modalidade, versão de regras, percentuais e ausência de cobrança. O frontend
+`molduras-simples.js` isola a experiência principal; o painel original permanece
+na área opcional. O PWA continua com atualização explícita e somente estáticos
+no cache. `Auth.php` e `Periods.php` permanecem sem alterações nesta simplificação.

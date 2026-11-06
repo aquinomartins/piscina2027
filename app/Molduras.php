@@ -5,13 +5,17 @@ namespace Piscina;
 final class Molduras {
     public function __construct(private Galeria $g){}
     public function frame(int $id): array {return $this->g->db->row('SELECT * FROM galeria_frames WHERE id=? FOR UPDATE',[$id])??throw new Problem('Moldura não encontrada.',404);}
+    public static function simple(array $f): bool {return (GaleriaInput::decode($f['metadata'])['mode']??'')==='asset';}
     public function transferFacts(array $f): array {
         $locations=$this->g->db->all('SELECT l.point_id,l.starts_at,l.ends_at,p.space_id,p.name point_name,p.authorized_from,p.authorized_until,p.opens,p.closes,p.weekdays,p.conditions,p.status point_status,s.name space_name,s.address,s.status space_status FROM galeria_allocations l JOIN galeria_points p ON p.id=l.point_id JOIN galeria_spaces s ON s.id=p.space_id WHERE l.frame_id=? AND l.ends_at>? ORDER BY l.id',[$f['id'],$this->g->now]);
-        if(!$locations)throw new Problem('Moldura sem ponto autorizado para operar.',409);
+        if(!$locations&&!self::simple($f))throw new Problem('Moldura sem ponto autorizado para operar.',409);
         $blocks=$this->g->db->all('SELECT starts_at,ends_at FROM galeria_blocks WHERE ends_at>? AND (frame_id=? OR point_id IN (SELECT point_id FROM galeria_allocations WHERE frame_id=?)) ORDER BY id',[$this->g->now,$f['id'],$f['id']]);
         return ['frame_version'=>$f['version'],'locations'=>$locations,'blocks'=>$blocks];
     }
-    public function busy(int $id): bool {return (bool)$this->g->db->row("SELECT id FROM galeria_agreements WHERE frame_id=? AND state IN ('RESERVED','EXHIBITING','SUSPENDED') LIMIT 1",[$id]);}
+    public function busy(int $id): bool {
+        return (bool)$this->g->db->row("SELECT id FROM galeria_agreements WHERE frame_id=? AND state IN ('RESERVED','EXHIBITING','SUSPENDED') LIMIT 1",[$id])
+            ||(MolduraLinks::installed($this->g->db)&&(bool)$this->g->db->row('SELECT id FROM galeria_links WHERE active_frame=?',[$id]));
+    }
     private function spaceBusy(int $id): void {if($this->g->db->row("SELECT id FROM galeria_agreements WHERE space_id=? AND state IN ('RESERVED','EXHIBITING','SUSPENDED') LIMIT 1",[$id]))throw new Problem('Espaço com compromisso vigente. Preserve as condições aceitas.',409);}
     public function space(int $actor,array $d): array {
         $this->g->admin($actor,$d);$name=GaleriaInput::text($d['name']??null,120);$address=GaleriaInput::text($d['address']??null,255);$responsible=GaleriaInput::text($d['responsible']??null,120);
@@ -35,6 +39,11 @@ final class Molduras {
     }
     private function metadata(array $d): array {
         $m=$d['metadata']??null;if(!is_array($m))throw new Problem('Informe os metadados do equipamento.');
+        if(($m['mode']??'')==='asset'){
+            GaleriaInput::fields($m,['schema_version','mode','description','rights']);
+            return ['schema_version'=>2,'mode'=>'asset','description'=>GaleriaInput::text($m['description']??'',2000,0),
+                'rights'=>GaleriaInput::text($m['rights']??'Titularidade da Moldura no aplicativo. Não inclui equipamento físico nem direitos autorais da NFT.',2000)];
+        }
         GaleriaInput::fields($m,['schema_version','description','serial','equipment','condition','width','height','unit','orientation','resolution','formats','installation','rights','delivery']);
         $out=['schema_version'=>1];
         foreach(['description'=>2000,'equipment'=>120,'condition'=>255,'installation'=>2000,'rights'=>2000,'delivery'=>2000] as $k=>$max)$out[$k]=GaleriaInput::text($m[$k]??null,$max);
@@ -44,11 +53,22 @@ final class Molduras {
         $out['unit']=$m['unit'];$out['orientation']=$m['orientation'];return $out;
     }
     public function save(int $actor,array $d): array {
-        $reason=$this->g->admin($actor,$d);$m=$this->metadata($d);$name=GaleriaInput::text($d['name']??null,120);$type=GaleriaInput::text($d['type_key']??null,40);if(!preg_match('/^[a-z0-9_-]+$/D',$type))throw new Problem('Tipo deve usar letras minúsculas, números ou hífen.');
+        $reason=$this->g->admin($actor,$d);$m=$this->metadata($d);$simple=($m['mode']??'')==='asset';$name=GaleriaInput::text($d['name']??null,120);$type=GaleriaInput::text($d['type_key']??($simple?'moldura':null),40);if(!preg_match('/^[a-z0-9_-]+$/D',$type))throw new Problem('Tipo deve usar letras minúsculas, números ou hífen.');
         if(!empty($d['frame_id'])){$f=$this->frame(Domain::id($d['frame_id']));if($this->busy((int)$f['id']))throw new Problem('Não altere equipamento ou direitos com compromissos vigentes.',409);if((string)($d['version']??'')!==$f['version'])throw new Problem('Moldura alterada. Consulte novamente.',409);$id=(int)$f['id'];$v=(int)$f['version']+1;$this->g->db->run('UPDATE galeria_frames SET name=?,type_key=?,metadata=?,version=?,verified_at=NULL,verified_by=NULL WHERE id=?',[$name,$type,GaleriaInput::json($m),$v,$id]);$this->g->db->run("UPDATE galeria_offers SET state='CANCELLED' WHERE frame_id=? AND state='ACTIVE'",[$id]);}
-        else{$code=strtoupper(GaleriaInput::text($d['code']??null,40));if(!preg_match('/^[A-Z0-9_-]+$/D',$code))throw new Problem('Código público inválido.');if($this->g->db->row('SELECT id FROM galeria_frames WHERE code=?',[$code]))throw new Problem('Código público já cadastrado.',409);$this->g->db->run('INSERT INTO galeria_frames(code,authority_id,name,type_key,metadata,created_by,created_at) VALUES(?,?,?,?,?,?,?)',[$code,bin2hex(random_bytes(16)),$name,$type,GaleriaInput::json($m),$actor,$this->g->now]);$id=(int)$this->g->db->pdo->lastInsertId();$v=1;}
+        else{$code=strtoupper(GaleriaInput::text($d['code']??($simple?'MLD-'.bin2hex(random_bytes(4)):null),40));if(!preg_match('/^[A-Z0-9_-]+$/D',$code))throw new Problem('Código público inválido.');if($this->g->db->row('SELECT id FROM galeria_frames WHERE code=?',[$code]))throw new Problem('Código público já cadastrado.',409);$this->g->db->run('INSERT INTO galeria_frames(code,authority_id,name,type_key,metadata,created_by,created_at) VALUES(?,?,?,?,?,?,?)',[$code,bin2hex(random_bytes(16)),$name,$type,GaleriaInput::json($m),$actor,$this->g->now]);$id=(int)$this->g->db->pdo->lastInsertId();$v=1;}
+        if($simple)$this->g->db->run("UPDATE galeria_frames SET status=CASE WHEN status='DRAFT' THEN 'ACTIVE' ELSE status END,verified_at=?,verified_by=? WHERE id=?",[$this->g->now,$actor,$id]);
         $this->g->db->run('INSERT INTO galeria_frame_versions(frame_id,version,metadata,author_id,reason,created_at) VALUES(?,?,?,?,?,?)',[$id,$v,GaleriaInput::json(['name'=>$name,'type_key'=>$type,'metadata'=>$m]),$actor,$reason,$this->g->now]);
         (new GaleriaAvailability($this->g))->frame($id);return ['frame_id'=>(string)$id,'version'=>(string)$v];
+    }
+    public function quick(int $actor,array $d): array {
+        if(!MolduraLinks::installed($this->g->db))throw new Problem('Instale a migração 005 antes de criar uma Moldura simples.',409);
+        $d['reason']='Criação de Moldura no modo simples';$this->g->admin($actor,$d);
+        $mode=$d['sale_mode']??'draft';if(!in_array($mode,['draft','public','direct'],true))throw new Problem('Escolha guardar, colocar à venda ou oferecer a um usuário.');
+        $r=$this->save($actor,['confirm'=>true,'reason'=>$d['reason'],'name'=>$d['name']??null,'metadata'=>['mode'=>'asset','description'=>$d['description']??'']]);
+        if($mode==='draft')return $r+['sale_state'=>'NOT_LISTED'];
+        $offer=['confirm'=>true,'reason'=>'Oferta criada junto com a Moldura','frame_id'=>$r['frame_id'],'asset'=>$d['asset']??'MR','price'=>$d['price']??null,'terms'=>$this->frame((int)$r['frame_id'])['name'].' — titularidade da Moldura no aplicativo.'];
+        if($mode==='direct')$offer['buyer_id']=Domain::id($d['buyer_id']??null);
+        return $r+$this->offer($actor,$offer)+['sale_state'=>$mode==='direct'?'DIRECT':'PUBLIC'];
     }
     public function allocate(int $actor,array $d): array {
         $this->g->admin($actor,$d);$f=$this->frame(Domain::id($d['frame_id']??null));$point=Domain::id($d['point_id']??null);$from=GaleriaInput::date($d['starts_at']??null);$to=GaleriaInput::date($d['ends_at']??null);
@@ -83,7 +103,7 @@ final class Molduras {
     public function verify(int $actor,array $d): array {
         $this->g->admin($actor,$d);$f=$this->frame(Domain::id($d['frame_id']??null));if($f['status']==='ARCHIVED')throw new Problem('Moldura arquivada.',409);
         if($this->g->db->row('SELECT frame_id FROM galeria_frame_custody WHERE frame_id=?',[$f['id']]))throw new Problem('Moldura no fundo de custódia para avaliação. Não há reemissão automática.',409);
-        if(!$this->g->db->row('SELECT id FROM galeria_allocations WHERE frame_id=? AND ends_at>?',[$f['id'],$this->g->now]))throw new Problem('Cadastre uma autorização de ponto antes da verificação.',409);
+        if(!self::simple($f)&&!$this->g->db->row('SELECT id FROM galeria_allocations WHERE frame_id=? AND ends_at>?',[$f['id'],$this->g->now]))throw new Problem('Cadastre uma autorização de ponto antes da verificação.',409);
         $this->g->db->run("UPDATE galeria_frames SET status='ACTIVE',verified_at=?,verified_by=? WHERE id=?",[$this->g->now,$actor,$f['id']]);(new GaleriaAvailability($this->g))->frame((int)$f['id']);return ['frame_id'=>$f['id'],'state'=>'ACTIVE'];
     }
     public function archive(int $actor,array $d): array {
@@ -117,12 +137,16 @@ final class Molduras {
         GaleriaInput::confirmed($d);$f=$this->frame(Domain::id($d['frame_id']??null));if($f['holder_id']!==null)$this->g->newBusiness();
         if($f['holder_id']===null)$this->g->admin($actor,$d);elseif((int)$f['holder_id']!==$actor)throw new Problem('Somente o titular define a revenda.',403);else $this->g->user($actor);
         if($f['status']!=='ACTIVE'||!$f['verified_at'])throw new Problem('Verifique equipamento e direitos antes de publicar.',409);
-        if(!$this->g->db->row('SELECT id FROM galeria_allocations WHERE frame_id=? AND ends_at>?',[$f['id'],$this->g->now]))throw new Problem('Ponto sem autorização vigente.',409);
-        $asset=$d['asset']??'';$amount=GaleriaInput::money($d['price']??null,$asset,true);$expires=GaleriaInput::date($d['expires_at']??null);if($expires<=$this->g->now)throw new Problem('Oferta deve ter validade futura.');
+        if(!self::simple($f)&&!$this->g->db->row('SELECT id FROM galeria_allocations WHERE frame_id=? AND ends_at>?',[$f['id'],$this->g->now]))throw new Problem('Ponto sem autorização vigente.',409);
+        $asset=$d['asset']??'';$amount=GaleriaInput::money($d['price']??null,$asset,!self::simple($f));$expires=!empty($d['expires_at'])?GaleriaInput::date($d['expires_at']):null;if($expires!==null&&$expires<=$this->g->now)throw new Problem('Oferta deve ter validade futura.');
+        if($expires===null&&!MolduraLinks::installed($this->g->db))throw new Problem('Instale a migração 005 para ofertas sem prazo.',409);
+        $buyer=!empty($d['buyer_id'])?Domain::id($d['buyer_id']):null;
+        if($buyer!==null){$this->g->user($buyer);if((string)$buyer===$f['holder_id'])throw new Problem('Escolha outro comprador.');}
         $terms=GaleriaInput::text($d['terms']??null,2000);$v=(int)$this->g->db->row('SELECT COALESCE(MAX(version),0) n FROM galeria_offers WHERE frame_id=?',[$f['id']])['n']+1;
         $this->g->db->run("UPDATE galeria_offers SET state='CANCELLED' WHERE frame_id=? AND state='ACTIVE'",[$f['id']]);
-        $this->g->db->run('INSERT INTO galeria_offers(frame_id,seller_id,asset,amount,version,terms,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)',[$f['id'],$f['holder_id'],$asset,$amount,$v,$terms,$expires,$this->g->now]);
-        return ['offer_id'=>$this->g->db->pdo->lastInsertId(),'version'=>(string)$v,'amount'=>$amount,'asset'=>$asset,'checkout_blocked'=>$this->busy((int)$f['id'])];
+        $this->g->db->run('INSERT INTO galeria_offers(frame_id,seller_id,buyer_id,asset,amount,version,terms,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$f['id'],$f['holder_id'],$buyer,$asset,$amount,$v,$terms,$expires,$this->g->now]);$id=$this->g->db->pdo->lastInsertId();
+        if($buyer!==null)$this->g->notify($buyer,'Molduras: oferta exclusiva de '.$f['name'].'. Confira o preço e confirme a compra na Galeria.');
+        return ['offer_id'=>$id,'version'=>(string)$v,'amount'=>$amount,'asset'=>$asset,'buyer_id'=>$buyer===null?null:(string)$buyer,'checkout_blocked'=>$this->busy((int)$f['id'])];
     }
     public function cancelOffer(int $actor,array $d): array {
         GaleriaInput::confirmed($d);$o=$this->g->db->row('SELECT * FROM galeria_offers WHERE id=? FOR UPDATE',[Domain::id($d['offer_id']??null)])??throw new Problem('Oferta não encontrada.',404);
@@ -132,13 +156,15 @@ final class Molduras {
     public function buy(int $actor,array $d): array {
         $this->g->newBusiness();$this->g->user($actor);GaleriaInput::confirmed($d);
         $o=$this->g->db->row('SELECT * FROM galeria_offers WHERE id=? FOR UPDATE',[Domain::id($d['offer_id']??null)])??throw new Problem('Oferta não encontrada.',404);$f=$this->frame((int)$o['frame_id']);
-        if($o['state']!=='ACTIVE'||$o['expires_at']<=$this->g->now||(string)($d['version']??'')!==$o['version']||(string)($d['amount']??'')!==$o['amount']||($d['asset']??'')!==$o['asset']||($d['seller_id']??null)!==$o['seller_id'])throw new Problem('Oferta alterada, encerrada ou vencida. Consulte novamente.',409);
-        if($f['holder_id']!==$o['seller_id']||$f['status']!=='ACTIVE'||!$f['verified_at']||$this->busy((int)$f['id']))throw new Problem('Revenda indisponível enquanto houver reservas/exposições ou condições pendentes.',409);
+        if($o['state']!=='ACTIVE'||($o['expires_at']!==null&&$o['expires_at']<=$this->g->now)||(string)($d['version']??'')!==$o['version']||(string)($d['amount']??'')!==$o['amount']||($d['asset']??'')!==$o['asset']||($d['seller_id']??null)!==$o['seller_id'])throw new Problem('Oferta alterada, encerrada ou vencida. Consulte novamente.',409);
+        if($f['holder_id']!==$o['seller_id']||$f['status']!=='ACTIVE'||!$f['verified_at']||$this->busy((int)$f['id']))throw new Problem('Compra indisponível: há condições pendentes ou uma associação que precisa ser encerrada com o consentimento das partes.',409);
         if($o['buyer_id']!==null&&(int)$o['buyer_id']!==$actor)throw new Problem('Oferta dirigida a outro comprador.',403);
         if((int)$f['holder_id']===$actor)throw new Problem('Você já é o titular.');
         if($f['holder_id']!==null)$this->g->user((int)$f['holder_id']);
-        $allocation=$this->g->db->row('SELECT * FROM galeria_allocations WHERE frame_id=? AND ends_at>? ORDER BY starts_at LIMIT 1',[$f['id'],$this->g->now])??throw new Problem('Autorização do ponto vencida.',409);
-        $this->pointAvailable((int)$allocation['point_id'],max($this->g->now,$allocation['starts_at']),$allocation['ends_at']);
+        if(!self::simple($f)){
+            $allocation=$this->g->db->row('SELECT * FROM galeria_allocations WHERE frame_id=? AND ends_at>? ORDER BY starts_at LIMIT 1',[$f['id'],$this->g->now])??throw new Problem('Autorização do ponto vencida.',409);
+            $this->pointAvailable((int)$allocation['point_id'],max($this->g->now,$allocation['starts_at']),$allocation['ends_at']);
+        }
         $to=$o['seller_id']===null?$this->g->domain->ledger->account(null,$o['asset'],'galeria_revenue'):$this->g->finance->userAccount((int)$o['seller_id'],$o['asset']);
         $this->g->finance->move($this->g->finance->userAccount($actor,$o['asset']),$to,$o['amount'],'GALERIA_SALE','offer',(int)$o['id'],'payment');
         $this->g->db->run('UPDATE galeria_frames SET holder_id=? WHERE id=?',[$actor,$f['id']]);

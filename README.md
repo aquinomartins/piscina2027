@@ -11,7 +11,7 @@ Aplicação PHP/MySQL para mercado de arte com **moeda exclusivamente simulada**
 - Anúncios, busca, perfis, propostas, contrapropostas, aprovação por versão, reservas próprias e liquidação bilateral atômica.
 - Cortes consistentes, processamento recuperável em lotes, direitos brutos por maiores restos, aceitação explícita e taxa independente.
 - Administração, histórico, notificações, feed público autorizado, interface móvel, PWA e página offline sem operações automáticas.
-- Galeria/Molduras: catálogo físico, aquisição e revenda negociada, coalizões bilaterais com cotas canônicas, eventos financiados, votação credenciada, apuração, ranking e painel administrativo. **Desabilitada por padrão**; exige migração 004 e configuração explícita do Admin.
+- Galeria/Molduras: criação só com nome, ofertas públicas ou exclusivas, compra/revenda e associação livre com NFTs, percentuais negociáveis e vinculação direta entre ativos do mesmo dono. Associação simples sem cotas, local ou agenda. Fluxo físico, cotas, eventos e ranking preservados como recursos avançados, em stand-by para novas operações. **Galeria desabilitada por padrão**; usa migrações 004/005 e ativação explícita do Admin.
 
 ## Requisitos de execução
 
@@ -39,7 +39,7 @@ No repositório GitHub, a pasta `downloads/` contém o **ZIP de produção** e o
 
 Para baixar a versão atual de todo o código pelo GitHub, use **Code → Download ZIP**. Esse download inclui os testes; siga o guia para servir somente `public/`.
 
-Para atualizar uma instalação existente com Galeria, use [Piscina_Galeria_Molduras.zip](downloads/Piscina_Galeria_Molduras.zip) e siga [o guia específico da Superdomínios](docs/GALERIA_DEPLOY.md). Aplique a migração 004 **antes** dos arquivos integrados. Preserve a configuração privada e os dados; não reaplique pacotes incrementais antigos após essa atualização.
+Para atualizar uma instalação existente com Galeria, use [Piscina_Molduras_Simples.zip](downloads/Piscina_Molduras_Simples.zip) e siga [o guia específico da Superdomínios](docs/GALERIA_DEPLOY.md). Se já instalou a 004, aplique somente a **005 antes dos arquivos**. Preserve a configuração privada e os dados; não reaplique pacotes incrementais antigos após essa atualização. O pacote atual `Piscina_Galeria_Molduras.zip` contém o mesmo runtime completo da atualização.
 
 ## Demonstração local opcional
 
@@ -67,7 +67,7 @@ Suíte de integridade: copie a configuração para um arquivo privado `tests/loc
 PISCINA_CONFIG=/CAMINHO/tests/local.php php tests/run.php
 ```
 
-A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A Galeria acrescenta 30 cenários focados; [o relatório](docs/GALERIA_TESTES.md) distingue as execuções completas das verificações adicionais.
+A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A execução integrada tem 113 cenários: 63 anteriores, 30 da Galeria avançada e 20 das Molduras simples. Resultados e reprodução: [relatório](docs/GALERIA_TESTES.md).
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
