@@ -67,7 +67,7 @@ Suíte de integridade: copie a configuração para um arquivo privado `tests/loc
 PISCINA_CONFIG=/CAMINHO/tests/local.php php tests/run.php
 ```
 
-A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A execução integrada tem 113 cenários: 63 anteriores, 30 da Galeria avançada e 20 das Molduras simples. Resultados e reprodução: [relatório](docs/GALERIA_TESTES.md).
+A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A verificação inclui regressão integrada de 113 cenários e uma execução final focada de 21 casos simples, após acrescentar a cobertura da revenda negociada. A suíte atual contém 114 casos (63 anteriores, 30 avançados e 21 simples). Resultados e reprodução: [relatório](docs/GALERIA_TESTES.md).
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 

@@ -43,5 +43,12 @@ final class MolduraTrades {
         $this->g->db->run('INSERT INTO galeria_offers(frame_id,seller_id,buyer_id,asset,amount,terms,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)',[$p['frame_id'],$p['seller_id'],$p['buyer_id'],$t['asset'],$t['amount'],$t['conditions'],$t['expires_at'],$this->g->now]);$offer=$this->g->db->pdo->lastInsertId();
         $sale=(new Molduras($this->g))->buy((int)$p['buyer_id'],['offer_id'=>$offer,'version'=>'1','amount'=>$t['amount'],'asset'=>$t['asset'],'seller_id'=>$p['seller_id'],'confirm'=>true]);$this->g->db->run("UPDATE galeria_trade_proposals SET state='SETTLED' WHERE id=?",[$p['id']]);return $sale+['trade_id'=>$p['id'],'state'=>'SETTLED'];
     }
-    public function read(int $actor,int $id): array {$p=$this->proposal($id);$this->g->domain->user($actor);if(!in_array((string)$actor,[$p['buyer_id'],$p['seller_id']],true)&&$this->g->domain->user($actor)['role']!=='admin')throw new Problem('Negociação de terceiros.',403);$p['versions']=$this->g->db->all('SELECT * FROM galeria_trade_versions WHERE proposal_id=? ORDER BY version DESC LIMIT 100',[$id]);foreach($p['versions'] as &$v){$v['terms']=GaleriaInput::decode($v['terms']);$v['terms_hash']=hash('sha256',Domain::canonical($v['terms']));}return $p;}
+    public function read(int $actor,int $id): array {
+        $p=$this->proposal($id);$this->g->domain->user($actor);
+        if(!in_array((string)$actor,[$p['buyer_id'],$p['seller_id']],true)&&$this->g->domain->user($actor)['role']!=='admin')throw new Problem('Negociação de terceiros.',403);
+        $p['versions']=$this->g->db->all('SELECT * FROM galeria_trade_versions WHERE proposal_id=? ORDER BY version DESC LIMIT 100',[$id]);
+        foreach($p['versions'] as &$v){$v['terms']=GaleriaInput::decode($v['terms']);$v['terms_hash']=hash('sha256',Domain::canonical($v['terms']));}unset($v);
+        $p['acceptances']=$this->g->db->all('SELECT version,user_id,created_at FROM galeria_trade_acceptances WHERE proposal_id=? ORDER BY version,user_id',[$id]);
+        return $p;
+    }
 }

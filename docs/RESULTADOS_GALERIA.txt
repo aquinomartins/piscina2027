@@ -1,7 +1,7 @@
 Verificação local em 06/11/2026. PHP 8.3.36 / MySQL 8.0.46 / Chromium 151.
 Não é implantação ou teste de carga da produção.
 
-Suíte integrada final
+Suíte integrada de 113
 PASS Aprovação concorrente concede 160000 centavos e uma NFT
 PASS Depósito concorrente com mesma chave não duplica; conflito de conteúdo
 PASS Retirada pública em mR$, cotas independentes e redepósito
@@ -119,6 +119,32 @@ PASS Molduras simples: consultas separam privacidade, disponibilidade e titulari
 113 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
 
 
+Suíte final focada de 21, após correção de consulta de aceites da revenda
+PASS Molduras simples: Admin cria só com nome, sem ponto, prazo, fotografia ou cotas
+PASS Molduras simples: criação é exclusiva do Admin e compra continua paga
+PASS Molduras simples: oferta exclusiva não debita, não vaza preço e exige o destinatário
+PASS Molduras simples: oferta sem vencimento permite compra concorrente consistente
+PASS Molduras simples: saldo insuficiente não transfere nem cobra parcialmente
+PASS Molduras simples: titular propõe NFT de outro usuário sem cotas ou agenda
+PASS Molduras simples: dono da NFT inicia; proponente cancela; terceiro não negocia
+PASS Molduras simples: contraproposta 40/60 exige novo aceite da versão exata
+PASS Molduras simples: mesmo dono confirma vínculo direto sem negociação fictícia
+PASS Molduras simples: percentuais inválidos são recusados e 0/100 permanece livre
+PASS Molduras simples: aceites concorrentes não associam a mesma Moldura duas vezes
+PASS Molduras simples: repetição de aceite retorna o acordo sem duplicação
+PASS Molduras simples: mesma NFT em aceites concorrentes tem uma única associação
+PASS Molduras simples: troca de titular durante proposta impede aceite desatualizado
+PASS Molduras simples: revenda exige encerramento consensual sem apagar percentuais
+PASS Molduras simples: depósito normal suspende associação e preserva termos e mídia
+PASS Molduras simples: consulta e encerramento continuam com novas contratações pausadas
+PASS Molduras simples: ativar opções avançadas não cria cobrança nem altera acordo
+PASS Molduras simples: recursos em stand-by preservam proposta antiga e cobrança já aceita
+PASS Molduras simples: consultas separam privacidade, disponibilidade e titularidade
+PASS Molduras simples: consulta de revenda retorna aceites e permite contraproposta e compra
+
+21 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+
 browser-root
 PASS Catálogo simples público em nove larguras; sem agenda nem preço de oferta exclusiva
 PASS Admin cria Moldura só com nome; descrição, imagem, data, espaço e cotas não são obrigatórios
@@ -130,6 +156,7 @@ PASS Anúncio e associação são situações separadas; revenda aguarda encerra
 PASS Ativos do mesmo dono têm vinculação direta, com uma confirmação e sem contraparte fictícia
 PASS Admin ativa recursos opcionais gradualmente; contratos e fluxo simples não são convertidos nem cobrados
 PASS Painel original continua disponível; Molduras simples não recebem campos físicos fictícios ou indefinidos
+PASS Revenda no modo simples: consulta exibe aceites, contraproposta altera preço e aceite conclui pagamento e transferência
 PASS Sem erros de JavaScript ou dados privados no cache do PWA
 
 browser-sub
@@ -143,6 +170,7 @@ PASS Anúncio e associação são situações separadas; revenda aguarda encerra
 PASS Ativos do mesmo dono têm vinculação direta, com uma confirmação e sem contraparte fictícia
 PASS Admin ativa recursos opcionais gradualmente; contratos e fluxo simples não são convertidos nem cobrados
 PASS Painel original continua disponível; Molduras simples não recebem campos físicos fictícios ou indefinidos
+PASS Revenda no modo simples: consulta exibe aceites, contraproposta altera preço e aceite conclui pagamento e transferência
 PASS Sem erros de JavaScript ou dados privados no cache do PWA
 
 legacy-ui

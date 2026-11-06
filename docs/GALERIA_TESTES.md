@@ -10,7 +10,8 @@ MariaDB e outros navegadores móveis não foram verificados nesta entrega.
 | Verificação | Resultado |
 |---|---|
 | Suíte integrada de domínio | **113 cenários, zero falhas**: 63 anteriores + 30 da Galeria avançada + 20 simples |
-| UX simples / API real | **11 grupos na raiz e 11 em `/piscina`**, aprovados |
+| Execução final focada após correção da revenda | **21 cenários simples, zero falhas**, incluindo consulta dos aceites |
+| UX simples / API real | **12 grupos na raiz e 12 em `/piscina`**, aprovados |
 | Fluxo avançado original / API real | 12 grupos de catálogo/Admin/negociação, aprovados |
 | Evento/votação original | 5 grupos na raiz e 5 em subpasta, aprovados |
 | Jornadas anteriores do app | 17 grupos, aprovados |
@@ -28,7 +29,12 @@ a compra de uma nova Moldura simples continua exigindo preço positivo. O fluxo
 Admin também foi conferido pela entrada real **Gerenciar Galeria**, que agora
 abre a administração simples, com o painel original na área opcional.
 
-## O que os 20 casos novos cobrem
+A execução completa de 113 precedeu o último caso de regressão da revenda.
+Depois da correção, passaram os 21 casos simples e as duas jornadas de interface
+com proposta, contraproposta e conclusão da compra. A suíte atual contém 114
+casos; não se apresenta essa sequência como uma execução completa de 114.
+
+## O que os 21 casos novos cobrem
 
 - Criação pelo Admin só com nome, sem fotografia, ponto, local, agenda ou cotas.
 - Preço positivo para novas Molduras simples; saldo insuficiente não transfere
@@ -49,6 +55,8 @@ abre a administração simples, com o painel original na área opcional.
   encerramento consensual. Termos e beneficiários antigos não são substituídos.
 - Depósito nativo continua funcionando e suspende o vínculo incompatível;
   termos, mídia referenciada e histórico são preservados.
+- Consulta privada de revenda retorna os aceites por versão; a tela identifica
+  quem já aceitou e permite contraproposta, aceite e conclusão da compra.
 - Consulta/resolução com novas contratações pausadas. Ativar recursos futuros
   não modifica acordos simples nem cria débito.
 - Proposta física anterior continua operável sob sua regra de X cotas, mesmo
