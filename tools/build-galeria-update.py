@@ -2,6 +2,7 @@
 from pathlib import Path
 import hashlib
 import zipfile
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = sorted(
@@ -18,6 +19,8 @@ DOCS = (
     'docs/GALERIA_DIAGNOSTICO.md', 'docs/DANGER_ZONE.md',
     'docs/RESULTADOS_GALERIA.txt', 'docs/images/galeria-catalogo-mobile.png',
     'docs/images/galeria-admin-desktop.png', 'docs/images/galeria-evento-mobile.png',
+    'docs/GALERIA_AVANCADA.md', 'docs/images/molduras-simples-mobile.png',
+    'docs/images/molduras-acordo-mobile.png', 'docs/images/molduras-admin-desktop.png',
 )
 
 
@@ -25,6 +28,7 @@ def main():
     files = RUNTIME + list(DOCS) + [
         'database/migrations/003_admin_danger.sql',
         'database/migrations/004_galeria.sql',
+        'database/migrations/005_molduras_simples.sql',
     ]
     assert len(files) == len(set(files))
     assert all(not p.startswith(('storage/', 'config/', 'tests/')) for p in files)
@@ -32,6 +36,7 @@ def main():
     assert b'galeria.js' in payload['public/sw.js']
     assert b'admin-danger.js' in payload['public/sw.js']
     assert b'qr-generator.js' in payload['public/sw.js']
+    assert b'molduras-simples.js' in payload['public/sw.js']
     payload['SHA256SUMS_GALERIA.txt'] = ''.join(
         f'{hashlib.sha256(data).hexdigest()}  {name}\n'
         for name, data in sorted(payload.items())
@@ -52,7 +57,12 @@ def main():
     (ROOT / 'downloads/GALERIA_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n'
     )
-    print(f'{target.name}: {len(RUNTIME)} arquivos de execução, duas migrações, guias e hashes conferidos.')
+    simple = ROOT / 'downloads/Piscina_Molduras_Simples.zip'
+    shutil.copyfile(target, simple)
+    (ROOT / 'downloads/MOLDURAS_SIMPLES_SHA256SUMS.txt').write_text(
+        f'{hashlib.sha256(simple.read_bytes()).hexdigest()}  {simple.name}\n'
+    )
+    print(f'{target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005, guias e hashes conferidos.')
 
 
 if __name__ == '__main__':

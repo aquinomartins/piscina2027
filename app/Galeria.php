@@ -10,6 +10,14 @@ final class Galeria {
     }
     public static function installed(Database $db): bool {return (bool)$db->row("SELECT version FROM schema_migrations WHERE version='004_galeria'");}
     public function enabled(): bool {return ($this->domain->config['galeria']['enabled']??false)===true;}
+    public function features(): array {
+        if(!MolduraLinks::installed($this->db))return ['physical'=>true,'events'=>true,'share_charges'=>true];
+        $r=$this->db->row('SELECT physical_available,events_available,share_charges_available FROM galeria_features WHERE id=1');
+        return ['physical'=>$r['physical_available']==='1','events'=>$r['events_available']==='1','share_charges'=>$r['share_charges_available']==='1'];
+    }
+    public function feature(string $name): void {
+        if(!($this->features()[$name]??false))throw new Problem('Recurso avançado em stand-by. A associação simples continua disponível sem esta exigência.',409,'galeria_feature_disabled');
+    }
     public function newBusiness(): void {
         if(!$this->enabled())throw new Problem('Galeria desabilitada na configuração privada.',409,'galeria_disabled');
         $this->domain->active();
@@ -27,6 +35,10 @@ final class Galeria {
         $m=new Molduras($this);$c=new Coalizoes($this);$e=new GaleriaEventos($this);
         return match($action) {
             'admin.galeria.settings'=>$this->settings($actor,$d),
+            'admin.galeria.features'=>$this->saveFeatures($actor,$d),
+            'admin.galeria.frame.quick'=>$m->quick($actor,$d),
+            'admin.galeria.link.resolve'=>(new MolduraLinks($this))->resolve($actor,$d),
+            'galeria.link.propose','galeria.link.counter','galeria.link.accept','galeria.link.reject','galeria.link.cancel','galeria.link.end'=>(new MolduraLinks($this))->apply($actor,substr($action,13),$d),
             'admin.galeria.incident'=>$this->recordIncident($actor,$d),
             'admin.galeria.space.save'=>$m->space($actor,$d), 'admin.galeria.point.save'=>$m->point($actor,$d),
             'admin.galeria.frame.save'=>$m->save($actor,$d), 'admin.galeria.frame.allocate'=>$m->allocate($actor,$d),
@@ -52,6 +64,13 @@ final class Galeria {
             default=>throw new Problem('Ação da Galeria desconhecida.',404)
         };
     }
+    private function saveFeatures(int $actor,array $d): array {
+        $this->admin($actor,$d);
+        if(!MolduraLinks::installed($this->db))throw new Problem('Instale a migração 005 antes de configurar os recursos avançados.',409);
+        foreach(['physical','events','share_charges'] as $key)if(!is_bool($d[$key]??null))throw new Problem('Confirme as opções avançadas.');
+        $this->db->run('UPDATE galeria_features SET physical_available=?,events_available=?,share_charges_available=?,updated_at=?,updated_by=? WHERE id=1',[(int)$d['physical'],(int)$d['events'],(int)$d['share_charges'],$this->now,$actor]);
+        return ['features'=>$this->features(),'existing_contracts'=>'UNCHANGED','simple_requirements'=>'NONE'];
+    }
     private function settings(int $a,array $d): array {
         $reason=$this->admin($a,$d);if(!is_bool($d['accepting']??null))throw new Problem('Informe a suspensão de novas contratações.');
         if($d['accepting']&&!$this->enabled())throw new Problem('Ative galeria.enabled na configuração privada após instalar a migração 004.',409);
@@ -73,6 +92,7 @@ final class Galeria {
         if($action==='proposal.approve'){$p=$this->db->row('SELECT v.nft_id FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version WHERE p.id=?',[$d['proposal_id']??0]);if($p&&$p['nft_id'])$ids[]=(int)$p['nft_id'];}
         if(in_array($action,['admin.danger.ban','admin.danger.delete'],true))$users[]=(int)($d['user_id']??0);
         if(!$ids&&!$users)return;
+        (new MolduraLinks($this))->affected($ids,$users,$action);
         $clauses=[];$args=[];foreach($ids as $id){$clauses[]='nft_id=?';$args[]=$id;}foreach($users as $id){$clauses[]='(frame_user=? OR nft_user=?)';$args[]=$id;$args[]=$id;}
         $rows=$this->db->all("SELECT * FROM galeria_agreements WHERE state IN ('RESERVED','EXHIBITING') AND ends_at>? AND (".implode(' OR ',$clauses).') ORDER BY id',[$this->now,...$args]);
         $c=new Coalizoes($this);
@@ -91,6 +111,7 @@ final class Galeria {
         $this->db->run("UPDATE galeria_proposals p JOIN galeria_proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version SET p.state='EXPIRED' WHERE p.state='PENDING' AND v.expires_at<=?",[$this->now]);
         $this->db->run("UPDATE galeria_trade_proposals p JOIN galeria_trade_versions v ON v.proposal_id=p.id AND v.version=p.current_version SET p.state='EXPIRED' WHERE p.state='PENDING' AND JSON_UNQUOTE(JSON_EXTRACT(v.terms,'$.expires_at'))<=?",[$this->now]);
         $this->db->run("UPDATE galeria_offers SET state='EXPIRED' WHERE state='ACTIVE' AND expires_at<=?",[$this->now]);
+        if(MolduraLinks::installed($this->db))$this->db->run("UPDATE galeria_link_proposals p JOIN galeria_link_versions v ON v.proposal_id=p.id AND v.version=p.current_version SET p.state='EXPIRED' WHERE p.state='PENDING' AND v.expires_at<=?",[$this->now]);
         $c=new Coalizoes($this);$events=new GaleriaEventos($this);
         $cursor=$this->db->row('SELECT agreement_cursor FROM galeria_settings WHERE id=1')['agreement_cursor'];
         $batch=$this->db->all("SELECT * FROM galeria_agreements WHERE state IN ('RESERVED','EXHIBITING','SUSPENDED') AND id>? ORDER BY id LIMIT 100",[$cursor]);

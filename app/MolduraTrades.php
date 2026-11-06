@@ -17,7 +17,7 @@ final class MolduraTrades {
         if(!$seller||$buyer===$seller||!in_array($actor,[$seller,$buyer],true))throw new Problem('Negocie apenas entre o titular atual e outro comprador identificado.',403);
         $su=$this->g->user($seller);$bu=$this->g->user($buyer);if($old&&($old['frame_id']!==$f['id']||$old['seller_id']!==(string)$seller||$old['buyer_id']!==(string)$buyer))throw new Problem('Titular ou partes alterados; crie outra negociação.',409);
         if($f['status']!=='ACTIVE'||!$f['verified_at'])throw new Problem('Moldura não operacional.',409);
-        $asset=$d['asset']??'';$amount=GaleriaInput::money($d['price']??null,$asset,true);$expires=GaleriaInput::date($d['expires_at']??null);if($expires<=$this->g->now||$expires>(new \DateTimeImmutable($this->g->now))->modify('+7 days')->format('Y-m-d H:i:s.u'))throw new Problem('Validade de até sete dias no futuro.');
+        $asset=$d['asset']??'';$amount=GaleriaInput::money($d['price']??null,$asset,!Molduras::simple($f));$expires=!empty($d['expires_at'])?GaleriaInput::date($d['expires_at']):(new \DateTimeImmutable($this->g->now))->modify('+7 days')->format('Y-m-d H:i:s.000000');if($expires<=$this->g->now||$expires>(new \DateTimeImmutable($this->g->now))->modify('+7 days')->format('Y-m-d H:i:s.u'))throw new Problem('Validade de até sete dias no futuro.');
         $facts=(new Molduras($this->g))->transferFacts($f);$m=GaleriaInput::decode($f['metadata']);return ['blocks'=>$facts['blocks'],'locations'=>$facts['locations'],'transfer_signature'=>hash('sha256',Domain::canonical($facts)),'frame_id'=>$f['id'],'frame_name'=>$f['name'],'authority_id'=>$f['authority_id'],'frame_version'=>$f['version'],'buyer_id'=>(string)$buyer,'buyer_name'=>$bu['display_name'],'seller_id'=>(string)$seller,'seller_name'=>$su['display_name'],'asset'=>$asset,'amount'=>$amount,'expires_at'=>$expires,'conditions'=>GaleriaInput::text($d['conditions']??null,2000),'rights'=>$m['rights']];
     }
     public function preview(int $actor,array $d): array {$old=null;if(!empty($d['trade_id'])){$old=$this->proposal(Domain::id($d['trade_id']));$this->party($actor,$old,$d);}$t=$this->terms($actor,$d,$old);return ['terms'=>$t,'preview_hash'=>hash('sha256',Domain::canonical($t))];}
@@ -43,5 +43,12 @@ final class MolduraTrades {
         $this->g->db->run('INSERT INTO galeria_offers(frame_id,seller_id,buyer_id,asset,amount,terms,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)',[$p['frame_id'],$p['seller_id'],$p['buyer_id'],$t['asset'],$t['amount'],$t['conditions'],$t['expires_at'],$this->g->now]);$offer=$this->g->db->pdo->lastInsertId();
         $sale=(new Molduras($this->g))->buy((int)$p['buyer_id'],['offer_id'=>$offer,'version'=>'1','amount'=>$t['amount'],'asset'=>$t['asset'],'seller_id'=>$p['seller_id'],'confirm'=>true]);$this->g->db->run("UPDATE galeria_trade_proposals SET state='SETTLED' WHERE id=?",[$p['id']]);return $sale+['trade_id'=>$p['id'],'state'=>'SETTLED'];
     }
-    public function read(int $actor,int $id): array {$p=$this->proposal($id);$this->g->domain->user($actor);if(!in_array((string)$actor,[$p['buyer_id'],$p['seller_id']],true)&&$this->g->domain->user($actor)['role']!=='admin')throw new Problem('Negociação de terceiros.',403);$p['versions']=$this->g->db->all('SELECT * FROM galeria_trade_versions WHERE proposal_id=? ORDER BY version DESC LIMIT 100',[$id]);foreach($p['versions'] as &$v){$v['terms']=GaleriaInput::decode($v['terms']);$v['terms_hash']=hash('sha256',Domain::canonical($v['terms']));}return $p;}
+    public function read(int $actor,int $id): array {
+        $p=$this->proposal($id);$this->g->domain->user($actor);
+        if(!in_array((string)$actor,[$p['buyer_id'],$p['seller_id']],true)&&$this->g->domain->user($actor)['role']!=='admin')throw new Problem('Negociação de terceiros.',403);
+        $p['versions']=$this->g->db->all('SELECT * FROM galeria_trade_versions WHERE proposal_id=? ORDER BY version DESC LIMIT 100',[$id]);
+        foreach($p['versions'] as &$v){$v['terms']=GaleriaInput::decode($v['terms']);$v['terms_hash']=hash('sha256',Domain::canonical($v['terms']));}unset($v);
+        $p['acceptances']=$this->g->db->all('SELECT version,user_id,created_at FROM galeria_trade_acceptances WHERE proposal_id=? ORDER BY version,user_id',[$id]);
+        return $p;
+    }
 }

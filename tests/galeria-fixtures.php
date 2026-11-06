@@ -26,6 +26,7 @@ function gaccept(int $actor,string $id,?string $key=null): array {
     $p=(new Piscina\GaleriaQueries(service()))->proposal($actor,(int)$id);$v=$p['versions'][0];return op($actor,'galeria.accept',['proposal_id'=>$id,'version'=>$p['current_version'],'terms_hash'=>$v['terms_hash'],'confirm'=>true,'license_confirm'=>true],$key);
 }
 function gfixture(int $count=4,bool $activate=true,string $prize='1000'): array {
+    ga('features',['physical'=>true,'events'=>true,'share_charges'=>true]);
     service()->config['galeria']=['enabled'=>true];ga('settings',['accepting'=>true]);op(1,'admin.parameters',['initial_credit'=>'10000.00','reason'=>'Fixture isolada; não é parâmetro comercial']);
     [$recipient]=user('ResponsavelGaleria');$s=ga('space.save',['name'=>'Espaço piloto','address'=>'Endereço público da demonstração','responsible'=>'Responsável local']);$space=(int)$s['space_id'];
     $policy=ga('policy',['space_id'=>(string)$space,'type_key'=>'digital','x'=>'2','recipient_id'=>(string)$recipient,'rights_ack'=>true]);

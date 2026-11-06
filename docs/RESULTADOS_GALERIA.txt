@@ -1,23 +1,70 @@
-Verificação local: PHP 8.3.36 / MySQL 8.0.46; não é validação da produção.
-Base 003 + banner PR #10. Galeria desligada por padrão.
+Verificação local em 06/11/2026. PHP 8.3.36 / MySQL 8.0.46 / Chromium 151.
+Não é implantação ou teste de carga da produção.
 
-baseline-domain.log
-
-63 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
-
-baseline-auth.log
-PASS Configuração insegura é recusada antes de criar contadores
-19 casos aprovados; 0 falhas.
-
-regression-final.log
-
-90 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
-
-regression-off.log
-
-63 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
-
-Suíte focada final
+Suíte integrada de 113
+PASS Aprovação concorrente concede 160000 centavos e uma NFT
+PASS Depósito concorrente com mesma chave não duplica; conflito de conteúdo
+PASS Retirada pública em mR$, cotas independentes e redepósito
+PASS 10 BYC não retiram por 11; pagamento único em mR$
+PASS Retiradas concorrentes: somente vencedor paga
+PASS Venda de 3 BYC por mR$90 sem emissão; segunda aprovação única
+PASS Ciclo por BYC custa 1 BYC líquido e não destrói cota
+PASS Venda de NFT preserva criador, venda de cota não acompanha NFT
+PASS Contraproposta libera reservas e invalida versão anterior
+PASS Proposta não reserva patrimônio alheio; saldo reservado não pode gastar
+PASS Expiração na ação libera recursos, mesmo antes do cron
+PASS Cancelamento e segunda aprovação concorrentes têm um único desfecho
+PASS Revisão e aprovação concorrentes preservam versão e reservas
+PASS Dois gastos incompatíveis não criam saldo negativo
+PASS N4 Q10 q3: bruto 240, taxa 100, líquido 140; participante sem cotas
+PASS Venda depois do corte não transfere direito, cron atrasado usa snapshot
+PASS Maiores restos: 6667,6667,6666; soma conserva D
+PASS N=0 Q=0 e taxa com saldo insuficiente permanecem válidos
+PASS Parâmetros novos não reescrevem obrigações nem cotação anterior
+PASS Produção não presume política nem data inicial
+PASS Precisão decimal, escala mR$, limites e JSON strings
+PASS Autorização: cadastro pendente e ativos de terceiros não movimentam
+PASS Retomada de processamento em lotes não publica direitos parciais
+PASS Períodos atrasados preservam retratos ordenados distintos
+PASS Reconciliação detecta adulteração de saldo agregado
+PASS Transação atravessa corte: eficácia pelo gate e snapshot anterior à próxima alteração
+PASS Uploads concorrentes preservam direito único e mesma chave usa hash do conteúdo
+PASS Falha de imagem não consome envio; somente criador autorizado
+PASS Tokens de e-mail e recuperação expiram, uso único e senha revoga sessões
+PASS Anúncio não liquida nem reserva; cancelamento remove publicação
+PASS Preço zero ou fração com total zero mantém entrega e não cria pagamento fictício
+PASS Deadlock MySQL real faz rollback e tentativa limitada sem duplicar efeitos
+PASS Cron recupera calendário longo por lotes; operação não ultrapassa cortes pendentes
+PASS Gasto novo libera reserva vencida do autor antes de validar saldo
+PASS Aprovação sem e-mail exige admin, motivo e confirmação; não falsifica verificação
+PASS Aprovação excepcional concorrente concede uma única carteira e NFT
+PASS Aprovação excepcional respeita limites e rollback da concessão
+PASS Reaprovação de concessão anterior preserva gastos, cotas e NFT
+PASS Carteiras administrativas negam participantes e não vazam para perfil público
+PASS Busca administrativa literal e paginação alcançam todos os cadastros sem criar contas
+PASS Extrato administrativo paginado e custódia contam apenas o último depositante
+PASS Troca administrativa substitui somente imagem/miniatura, com auditoria e proveniência
+PASS Troca de imagem é exclusiva de admin; mantém envio único do criador
+PASS Troca administrativa exige motivo, confirmação, versão e par JPEG válido
+PASS Troca bloqueada para NFT reservada e para custódia alterada desde a consulta
+PASS Duas trocas simultâneas com a mesma versão têm um vencedor
+PASS Replay da troca não duplica evento e chave diferente com versão antiga falha
+PASS Cron preserva versões auditadas e remove somente órfãos antigos
+PASS Troca em NFT na piscina não altera economia nem captura calendário atrasado
+PASS Danger: multa conserva mR$ e não utiliza emissão, reservas ou dívida
+PASS Danger: participantes, contas admin, motivo e confirmação são protegidos
+PASS Danger: banimento cancela negócios e libera reservas de ambas as partes
+PASS Danger: expiração independe do Cron e não aprova ou verifica cadastro
+PASS Danger: exclusão preserva patrimônio de terceiros, NFTs POOL e proveniência
+PASS Danger: confirmação forte de exclusão e rollback preservam ativos
+PASS Danger: falha durante custódia faz rollback integral da exclusão e das transferências
+PASS Danger: reservas de contraparte são liberadas antes da custódia
+PASS Danger: reserva órfã impede exclusão parcial e mantém acesso e saldo
+PASS Danger: cotas em custódia conservam Q, direitos e taxas pendentes nos cortes futuros
+PASS Danger: concorrência banimento/operação respeita ordem do gate
+PASS Danger: multa concorrente não ultrapassa saldo e não duplica chave
+PASS Danger: senha administrativa é idempotente e não aparece em auditoria ou recibos
+PASS Danger: redefinição não remove banimento nem aprova pendência; excluído é recusado
 PASS Galeria: desabilitada/pause bloqueia novas compras e mantém o jogo antigo
 PASS Galeria: quatro coalizões guardam exatamente 16 cotas canônicas com direitos preservados
 PASS Galeria: compra concorrente tem um vencedor e mantém autoridade e histórico
@@ -48,11 +95,85 @@ PASS Galeria: incidente posterior ao pagamento não altera saldos ou resultado
 PASS Galeria: preparação sequencial do Admin não consome o limite de falhas nem o antigo
 PASS Galeria: confirmação de senha bloqueia dez falhas e terceiro não confirma como Admin
 PASS Galeria: alteração de local cancela oferta antiga e exige novo consentimento na revenda
+PASS Molduras simples: Admin cria só com nome, sem ponto, prazo, fotografia ou cotas
+PASS Molduras simples: criação é exclusiva do Admin e compra continua paga
+PASS Molduras simples: oferta exclusiva não debita, não vaza preço e exige o destinatário
+PASS Molduras simples: oferta sem vencimento permite compra concorrente consistente
+PASS Molduras simples: saldo insuficiente não transfere nem cobra parcialmente
+PASS Molduras simples: titular propõe NFT de outro usuário sem cotas ou agenda
+PASS Molduras simples: dono da NFT inicia; proponente cancela; terceiro não negocia
+PASS Molduras simples: contraproposta 40/60 exige novo aceite da versão exata
+PASS Molduras simples: mesmo dono confirma vínculo direto sem negociação fictícia
+PASS Molduras simples: percentuais inválidos são recusados e 0/100 permanece livre
+PASS Molduras simples: aceites concorrentes não associam a mesma Moldura duas vezes
+PASS Molduras simples: repetição de aceite retorna o acordo sem duplicação
+PASS Molduras simples: mesma NFT em aceites concorrentes tem uma única associação
+PASS Molduras simples: troca de titular durante proposta impede aceite desatualizado
+PASS Molduras simples: revenda exige encerramento consensual sem apagar percentuais
+PASS Molduras simples: depósito normal suspende associação e preserva termos e mídia
+PASS Molduras simples: consulta e encerramento continuam com novas contratações pausadas
+PASS Molduras simples: ativar opções avançadas não cria cobrança nem altera acordo
+PASS Molduras simples: recursos em stand-by preservam proposta antiga e cobrança já aceita
+PASS Molduras simples: consultas separam privacidade, disponibilidade e titularidade
 
-30 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+113 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
 
 
-browser-ui-release
+Suíte final focada de 21, após correção de consulta de aceites da revenda
+PASS Molduras simples: Admin cria só com nome, sem ponto, prazo, fotografia ou cotas
+PASS Molduras simples: criação é exclusiva do Admin e compra continua paga
+PASS Molduras simples: oferta exclusiva não debita, não vaza preço e exige o destinatário
+PASS Molduras simples: oferta sem vencimento permite compra concorrente consistente
+PASS Molduras simples: saldo insuficiente não transfere nem cobra parcialmente
+PASS Molduras simples: titular propõe NFT de outro usuário sem cotas ou agenda
+PASS Molduras simples: dono da NFT inicia; proponente cancela; terceiro não negocia
+PASS Molduras simples: contraproposta 40/60 exige novo aceite da versão exata
+PASS Molduras simples: mesmo dono confirma vínculo direto sem negociação fictícia
+PASS Molduras simples: percentuais inválidos são recusados e 0/100 permanece livre
+PASS Molduras simples: aceites concorrentes não associam a mesma Moldura duas vezes
+PASS Molduras simples: repetição de aceite retorna o acordo sem duplicação
+PASS Molduras simples: mesma NFT em aceites concorrentes tem uma única associação
+PASS Molduras simples: troca de titular durante proposta impede aceite desatualizado
+PASS Molduras simples: revenda exige encerramento consensual sem apagar percentuais
+PASS Molduras simples: depósito normal suspende associação e preserva termos e mídia
+PASS Molduras simples: consulta e encerramento continuam com novas contratações pausadas
+PASS Molduras simples: ativar opções avançadas não cria cobrança nem altera acordo
+PASS Molduras simples: recursos em stand-by preservam proposta antiga e cobrança já aceita
+PASS Molduras simples: consultas separam privacidade, disponibilidade e titularidade
+PASS Molduras simples: consulta de revenda retorna aceites e permite contraproposta e compra
+
+21 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+
+browser-root
+PASS Catálogo simples público em nove larguras; sem agenda nem preço de oferta exclusiva
+PASS Admin cria Moldura só com nome; descrição, imagem, data, espaço e cotas não são obrigatórios
+PASS Oferta dirigida pela interface preserva saldo e propriedade; Admin, CSRF e destinatário validados no servidor
+PASS Compra exclusiva pela interface recupera resposta perdida após commit sem duplicar pagamento
+PASS Titular escolhe NFT de outro aluno; proprietários e divisão 30/70 aparecem antes do envio sem cotas
+PASS Contraproposta 40/60 só ativa após o novo aceite; acordo mantém percentuais e zero cotas disponíveis/reservadas
+PASS Anúncio e associação são situações separadas; revenda aguarda encerramento consensual e preserva o histórico
+PASS Ativos do mesmo dono têm vinculação direta, com uma confirmação e sem contraparte fictícia
+PASS Admin ativa recursos opcionais gradualmente; contratos e fluxo simples não são convertidos nem cobrados
+PASS Painel original continua disponível; Molduras simples não recebem campos físicos fictícios ou indefinidos
+PASS Revenda no modo simples: consulta exibe aceites, contraproposta altera preço e aceite conclui pagamento e transferência
+PASS Sem erros de JavaScript ou dados privados no cache do PWA
+
+browser-sub
+PASS Catálogo simples público em nove larguras; sem agenda nem preço de oferta exclusiva
+PASS Admin cria Moldura só com nome; descrição, imagem, data, espaço e cotas não são obrigatórios
+PASS Oferta dirigida pela interface preserva saldo e propriedade; Admin, CSRF e destinatário validados no servidor
+PASS Compra exclusiva pela interface recupera resposta perdida após commit sem duplicar pagamento
+PASS Titular escolhe NFT de outro aluno; proprietários e divisão 30/70 aparecem antes do envio sem cotas
+PASS Contraproposta 40/60 só ativa após o novo aceite; acordo mantém percentuais e zero cotas disponíveis/reservadas
+PASS Anúncio e associação são situações separadas; revenda aguarda encerramento consensual e preserva o histórico
+PASS Ativos do mesmo dono têm vinculação direta, com uma confirmação e sem contraparte fictícia
+PASS Admin ativa recursos opcionais gradualmente; contratos e fluxo simples não são convertidos nem cobrados
+PASS Painel original continua disponível; Molduras simples não recebem campos físicos fictícios ou indefinidos
+PASS Revenda no modo simples: consulta exibe aceites, contraproposta altera preço e aceite conclui pagamento e transferência
+PASS Sem erros de JavaScript ou dados privados no cache do PWA
+
+legacy-ui
 PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
 PASS Banner da home e navegação anterior preservados
 PASS Admin → Galeria e Danger Zone coexistem; painel legível em celular e desktop
@@ -66,28 +187,14 @@ PASS Suspensão pela Administração mantém cancelamento consensual e devoluç�
 PASS Negociação de preço pela interface: proposta, contraproposta e segundo aceite transferem Moldura e pagamento juntos
 PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
 
-browser-ui-sub-release
-PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
-PASS Banner da home e navegação anterior preservados
-PASS Admin → Galeria e Danger Zone coexistem; painel legível em celular e desktop
-PASS Cadastro de Moldura pela interface com senha, metadados validados e auditoria
-PASS Fotografia reencodificada; rascunho e imagem privados para visitante
-PASS Permissões por objeto, Admin e preço conferidos no servidor
-PASS Compra pela interface recupera resposta perdida sem duplicar débito ou titularidade
-PASS Proposta, resumo integral, contraproposta e aceite da mesma versão reservam X de cada parte
-PASS Versão antiga e consulta de acordo alheio recusadas sem cobrança adicional
-PASS Suspensão pela Administração mantém cancelamento consensual e devolução integral
-PASS Negociação de preço pela interface: proposta, contraproposta e segundo aceite transferem Moldura e pagamento juntos
-PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
-
-browser-live-final
+legacy-live
 PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
 PASS Banner da home e navegação anterior preservados
 PASS QR das quatro Molduras abre o mesmo evento; eleitor credenciado vota uma vez e partes interessadas são recusadas
 PASS Sem parciais, dados eleitorais ou caminhos privados na resposta pública
 PASS Cache do PWA contém apenas recursos estáticos, sem API, finanças, votos ou mídia dinâmica
 
-browser-live-sub
+legacy-live-sub
 PASS Catálogo público e navegação em nove larguras, sem rolagem horizontal
 PASS Banner da home e navegação anterior preservados
 PASS QR das quatro Molduras abre o mesmo evento; eleitor credenciado vota uma vez e partes interessadas são recusadas
@@ -132,7 +239,7 @@ PASS Resposta perdida recupera recibo sem repetir multa ou reter senha
 PASS Recuperação pública em página aberta e navegador anônimo; GET não consome; tokens inválidos, usados e expirados recusados
 PASS Exclusão definitiva move ativos à custódia privada, bloqueia reaprovação e preserva origem
 
-pwa-release
+pwa
 PASS /: menu acessível em 320/360/390/412/700/701/1440 px; navegação mobile preservada
 PASS /: Baixar o app usa prompt quando disponível e instruções como alternativa
 PASS /: atualização real via menu, waiting pré-existente, bloqueio de operação e recarga única aprovados
@@ -140,18 +247,4 @@ PASS /piscina: menu acessível em 320/360/390/412/700/701/1440 px; navegação m
 PASS /piscina: Baixar o app usa prompt quando disponível e instruções como alternativa
 PASS /piscina: atualização real via aviso da tela inicial, waiting pré-existente, bloqueio de operação e recarga única aprovados
 
-PASS Migração 004 aplicada duas vezes; 31 tabelas antigas preservadas, saldo e NFT originais intactos; conciliação vazia e entrada comercial suspensa.
-
-
-Conciliação após demonstração
-{
-    "galeria": [],
-    "balances": [],
-    "unbalanced": [],
-    "negative": [],
-    "reserves": [],
-    "custody": [],
-    "nftReserves": [],
-    "distribution": [],
-    "escrow": []
-}
+PASS Migração 005 aplicada duas vezes; 59 tabelas anteriores preservadas, com carteiras, NFT, Moldura, oferta, política e proposta 004 reais de teste. Recursos avançados em stand-by; conciliação vazia.

@@ -10,21 +10,25 @@ final class GaleriaQueries {
     public static function terms(array $t): array {unset($t['image']['image_path'],$t['image']['thumbnail_path']);return $t;}
     public function status(): array {
         $installed=Galeria::installed($this->g->db);$s=$installed?$this->g->db->row('SELECT accepting,has_commitments FROM galeria_settings WHERE id=1'):['accepting'=>'0','has_commitments'=>'0'];
-        return ['installed'=>$installed,'enabled'=>$this->g->enabled(),'accepting'=>$this->g->enabled()&&$s['accepting']==='1','has_commitments'=>$s['has_commitments']==='1'];
+        $simple=MolduraLinks::installed($this->g->db);
+        $legacy=$installed&&(bool)($this->g->db->row('SELECT id FROM galeria_proposals LIMIT 1')??$this->g->db->row('SELECT id FROM galeria_events LIMIT 1'));
+        return ['installed'=>$installed,'simple_installed'=>$simple,'features'=>$this->g->features(),'has_legacy'=>$legacy,'enabled'=>$this->g->enabled(),'accepting'=>$this->g->enabled()&&$s['accepting']==='1','has_commitments'=>$s['has_commitments']==='1'];
     }
     private function installed(): void {if(!Galeria::installed($this->g->db))throw new Problem('Galeria aguardando instalação da migração 004.',409,'galeria_pending');}
     public function catalog(array $q): array {
         $status=$this->status();if(!$status['installed'])return $status+['rows'=>[],'spaces'=>[],'offset'=>0,'has_more'=>false];
         $where=["f.status IN ('ACTIVE','ARCHIVED')"];$params=[];
-        if(!$status['enabled'])$where[]="EXISTS(SELECT 1 FROM galeria_agreements a WHERE a.frame_id=f.id)";
+        if(!$status['enabled'])$where[]="(EXISTS(SELECT 1 FROM galeria_agreements a WHERE a.frame_id=f.id)".($status['simple_installed']?' OR EXISTS(SELECT 1 FROM galeria_links a WHERE a.frame_id=f.id)':'').')';
         if(!empty($q['q'])){$where[]='(f.name LIKE ? OR f.code LIKE ?)';$search='%'.mb_substr((string)$q['q'],0,80).'%';$params[]=$search;$params[]=$search;}
         if(!empty($q['space_id'])){$where[]='p.space_id=?';$params[]=Domain::id($q['space_id']);}
+        if(!empty($q['for_sale']))$where[]='o.id IS NOT NULL';
+        if(!empty($q['for_association'])){$where[]="f.holder_id IS NOT NULL AND f.status='ACTIVE'";$where[]="NOT EXISTS(SELECT 1 FROM galeria_agreements a WHERE a.frame_id=f.id AND a.state IN ('RESERVED','EXHIBITING','SUSPENDED'))";if($status['simple_installed'])$where[]='NOT EXISTS(SELECT 1 FROM galeria_links a WHERE a.active_frame=f.id)';}
         if(!empty($q['mine']))throw new Problem('Use a consulta autenticada de suas Molduras.');
         $page=$this->page("SELECT f.id,f.code,f.authority_id,f.name,f.type_key,f.holder_id,f.status,f.metadata,u.display_name holder_name,p.name point_name,p.space_id,s.name space_name,s.address,o.id offer_id,o.version offer_version,o.amount,o.asset,o.seller_id,o.terms offer_terms,o.expires_at,
             (SELECT id FROM galeria_photos ph WHERE ph.frame_id=f.id ORDER BY id DESC LIMIT 1) photo_id,
             EXISTS(SELECT 1 FROM galeria_agreements a WHERE a.frame_id=f.id AND a.state IN ('RESERVED','EXHIBITING','SUSPENDED')) busy
             FROM galeria_frames f LEFT JOIN users u ON u.id=f.holder_id LEFT JOIN galeria_allocations l ON l.id=(SELECT id FROM galeria_allocations WHERE frame_id=f.id AND ends_at>UTC_TIMESTAMP(6) ORDER BY starts_at LIMIT 1)
-            LEFT JOIN galeria_points p ON p.id=l.point_id LEFT JOIN galeria_spaces s ON s.id=p.space_id LEFT JOIN galeria_offers o ON o.frame_id=f.id AND o.state='ACTIVE' AND o.buyer_id IS NULL AND o.expires_at>UTC_TIMESTAMP(6) WHERE ".implode(' AND ',$where).' ORDER BY f.id DESC',$params,$q);
+            LEFT JOIN galeria_points p ON p.id=l.point_id LEFT JOIN galeria_spaces s ON s.id=p.space_id LEFT JOIN galeria_offers o ON o.frame_id=f.id AND o.state='ACTIVE' AND o.buyer_id IS NULL AND (o.expires_at IS NULL OR o.expires_at>UTC_TIMESTAMP(6)) WHERE ".implode(' AND ',$where).' ORDER BY f.id DESC',$params,$q);
         foreach($page['rows'] as &$r){$r['metadata']=GaleriaInput::decode($r['metadata']);if(!$status['accepting']){$r['checkout_disabled']=true;}}unset($r);
         return $status+$page+['spaces'=>$this->g->db->all("SELECT id,name FROM galeria_spaces WHERE status<>'ARCHIVED' ORDER BY name LIMIT 200")];
     }
@@ -35,7 +39,9 @@ final class GaleriaQueries {
         $f['metadata']=GaleriaInput::decode($f['metadata']);$f['photos']=$this->g->db->all('SELECT id,sha FROM galeria_photos WHERE frame_id=? ORDER BY id',[$id]);
         $f['allocations']=$this->g->db->all('SELECT l.id,l.starts_at,l.ends_at,p.id point_id,p.name point_name,p.space_id,p.authorized_until,p.opens,p.closes,p.weekdays,p.conditions,s.name space_name,s.address FROM galeria_allocations l JOIN galeria_points p ON p.id=l.point_id JOIN galeria_spaces s ON s.id=p.space_id WHERE l.frame_id=? ORDER BY l.starts_at DESC LIMIT 48',[$id]);
         $f['current_event']=$this->g->db->row("SELECT e.id FROM galeria_candidates c JOIN galeria_events e ON e.id=c.event_id WHERE c.frame_id=? AND c.state='VALID' AND e.state IN ('REGISTRATION','PREPARED','VOTING','REVIEW','FINALIZED','SETTLED') ORDER BY CASE e.state WHEN 'VOTING' THEN 0 WHEN 'PREPARED' THEN 1 WHEN 'REGISTRATION' THEN 2 ELSE 3 END,e.id DESC LIMIT 1",[$id]);
-        $f['offers']=$this->g->db->all("SELECT id,seller_id,asset,amount,version,terms,expires_at FROM galeria_offers WHERE frame_id=? AND buyer_id IS NULL AND state='ACTIVE' AND expires_at>UTC_TIMESTAMP(6)",[$id]);
+        $offerVisibility=$admin?'1=1':'(o.buyer_id IS NULL OR o.buyer_id=? OR o.seller_id=?)';$offerArgs=$admin?[$id]:[$id,$viewer,$viewer];
+        $f['offers']=$this->g->db->all("SELECT o.id,o.seller_id,o.buyer_id,u.display_name buyer_name,o.asset,o.amount,o.version,o.terms,o.expires_at FROM galeria_offers o LEFT JOIN users u ON u.id=o.buyer_id WHERE o.frame_id=? AND $offerVisibility AND o.state='ACTIVE' AND (o.expires_at IS NULL OR o.expires_at>UTC_TIMESTAMP(6))",$offerArgs);
+        $f['simple_link']=(new MolduraSimpleQueries($this->domain))->publicLink($id,$viewer,$admin);
         $f['agenda']=$this->g->db->all("SELECT id,starts_at,ends_at,state,event_id FROM galeria_agreements WHERE frame_id=? AND state IN ('RESERVED','EXHIBITING','SUSPENDED') ORDER BY starts_at LIMIT 100",[$id]);
         $f['blocks']=$this->g->db->all('SELECT starts_at,ends_at'.($admin?',reason':'').' FROM galeria_blocks WHERE frame_id=? ORDER BY starts_at DESC LIMIT 48',[$id]);
         $historyOffset=$this->offset($q);$f['offset']=$historyOffset;
