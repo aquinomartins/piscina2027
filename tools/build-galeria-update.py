@@ -15,6 +15,9 @@ RUNTIME = sorted(
     )]
 )
 DOCS = (
+    'docs/MOLDURAS_CARTEIRA.md', 'docs/MOLDURAS_CARTEIRA_TESTES.md',
+    'docs/RESULTADOS_CARTEIRA.txt', 'docs/images/carteira-moldura-mobile.png',
+    'docs/images/carteira-nft-mobile.png', 'docs/images/carteira-pendencias-mobile.png',
     'docs/GALERIA.md', 'docs/GALERIA_DEPLOY.md', 'docs/GALERIA_TESTES.md',
     'docs/GALERIA_DIAGNOSTICO.md', 'docs/DANGER_ZONE.md',
     'docs/RESULTADOS_GALERIA.txt', 'docs/images/galeria-catalogo-mobile.png',
@@ -37,6 +40,8 @@ def main():
     assert b'admin-danger.js' in payload['public/sw.js']
     assert b'qr-generator.js' in payload['public/sw.js']
     assert b'molduras-simples.js' in payload['public/sw.js']
+    assert b'molduras-carteira.js' in payload['public/sw.js']
+    assert b'molduras-carteira.css' in payload['public/sw.js']
     payload['SHA256SUMS_GALERIA.txt'] = ''.join(
         f'{hashlib.sha256(data).hexdigest()}  {name}\n'
         for name, data in sorted(payload.items())
@@ -62,7 +67,12 @@ def main():
     (ROOT / 'downloads/MOLDURAS_SIMPLES_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(simple.read_bytes()).hexdigest()}  {simple.name}\n'
     )
-    print(f'{target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005, guias e hashes conferidos.')
+    wallet = ROOT / 'downloads/Piscina_Portfolio_Pendencias.zip'
+    shutil.copyfile(target, wallet)
+    (ROOT / 'downloads/CARTEIRA_SHA256SUMS.txt').write_text(
+        f'{hashlib.sha256(wallet.read_bytes()).hexdigest()}  {wallet.name}\n'
+    )
+    print(f'{wallet.name}, {target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005, guias e hashes conferidos.')
 
 
 if __name__ == '__main__':

@@ -39,7 +39,7 @@ No repositório GitHub, a pasta `downloads/` contém o **ZIP de produção** e o
 
 Para baixar a versão atual de todo o código pelo GitHub, use **Code → Download ZIP**. Esse download inclui os testes; siga o guia para servir somente `public/`.
 
-Para atualizar uma instalação existente com Galeria, use [Piscina_Molduras_Simples.zip](downloads/Piscina_Molduras_Simples.zip) e siga [o guia específico da Superdomínios](docs/GALERIA_DEPLOY.md). Se já instalou a 004, aplique somente a **005 antes dos arquivos**. Preserve a configuração privada e os dados; não reaplique pacotes incrementais antigos após essa atualização. O pacote atual `Piscina_Galeria_Molduras.zip` contém o mesmo runtime completo da atualização.
+Para integrar as Molduras ao Portfólio e às Pendências, use [Piscina_Portfolio_Pendencias.zip](downloads/Piscina_Portfolio_Pendencias.zip) e siga [o guia da integração](docs/MOLDURAS_CARTEIRA.md). **Com 004 e 005 já instaladas, não há nova migração.** Se possui apenas a 004, aplique a 005 antes dos arquivos, conforme [o guia da Galeria na Superdomínios](docs/GALERIA_DEPLOY.md). Preserve a configuração privada e os dados; não reaplique pacotes antigos. Os ZIPs atuais `Piscina_Galeria_Molduras.zip` e `Piscina_Molduras_Simples.zip` contêm o mesmo runtime compatível.
 
 ## Demonstração local opcional
 
@@ -71,6 +71,8 @@ A suíte usa MySQL real, inclusive processos/conexões independentes para concor
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
+Integração de Molduras: `tests/molduras-carteira-domain.php` participa da suíte de domínio. `tests/molduras-carteira-browser.cjs` verifica os formulários existentes no Portfólio/Pendências, responsabilidade, propriedade, percentuais, falhas e celular, com API real. [Resultados e reprodução](docs/MOLDURAS_CARTEIRA_TESTES.md).
+
 Menu de instalação e atualização: `npm run test:pwa` executa o frontend real com API simulada e service workers reais em servidor local, sem banco ou senhas. Verifica sete larguras na raiz e em subpasta, instalação, aviso de atualização no menu e na tela inicial, ativação explícita e proteção de operações pendentes. Configure `CHROMIUM_PATH` se necessário.
 
 Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/build-packages.py` em um checkout Git. Python é ferramenta opcional de desenvolvimento e não integra o pacote de produção. O script usa somente arquivos versionados dos diretórios permitidos e exclui configuração privada e dados locais.
@@ -90,6 +92,8 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [Galeria e Molduras: uso, regras e limites](docs/GALERIA.md)
 - [Galeria: instalação, ativação e suspensão na Superdomínios](docs/GALERIA_DEPLOY.md)
 - [Galeria: testes, demonstração e prévias](docs/GALERIA_TESTES.md)
+- [Molduras no Portfólio e nas Pendências: uso e instalação](docs/MOLDURAS_CARTEIRA.md)
+- [Integração das carteiras: testes e prévias](docs/MOLDURAS_CARTEIRA_TESTES.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 

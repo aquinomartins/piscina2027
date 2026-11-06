@@ -18,6 +18,7 @@ try {
         $result=match($action) {
             'meta'=>(function() use($auth,$domain,$config,$galeria){$u=null;try{$u=$domain->user($auth->actor());}catch(Piscina\Problem $e){if($e->status!==401) throw $e;}return ['csrf'=>$auth->csrf(),'user'=>$u,'environment'=>$config['environment'],'base_path'=>$config['base_path'],'policy_active'=>$domain->policy()!==null,'galeria'=>$galeria->status(),'policy'=>require PISCINA_APP_ROOT.'/config/policy.php'];})(),
             'galeria.status'=>$galeria->status(),'galeria.catalog'=>$galeria->catalog($_GET),
+            'pending.summary'=>(new Piscina\ParticipantActivity($domain))->counts($auth->actor()),
             'galeria.simple.mine'=>(new Piscina\MolduraSimpleQueries($domain))->mine($auth->actor(),$_GET),
             'galeria.simple.admin'=>(new Piscina\MolduraSimpleQueries($domain))->admin($auth->actor(),$_GET),
             'galeria.people'=>(new Piscina\MolduraSimpleQueries($domain))->people($auth->actor(),$_GET),

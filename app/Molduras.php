@@ -145,7 +145,7 @@ final class Molduras {
         $terms=GaleriaInput::text($d['terms']??null,2000);$v=(int)$this->g->db->row('SELECT COALESCE(MAX(version),0) n FROM galeria_offers WHERE frame_id=?',[$f['id']])['n']+1;
         $this->g->db->run("UPDATE galeria_offers SET state='CANCELLED' WHERE frame_id=? AND state='ACTIVE'",[$f['id']]);
         $this->g->db->run('INSERT INTO galeria_offers(frame_id,seller_id,buyer_id,asset,amount,version,terms,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$f['id'],$f['holder_id'],$buyer,$asset,$amount,$v,$terms,$expires,$this->g->now]);$id=$this->g->db->pdo->lastInsertId();
-        if($buyer!==null)$this->g->notify($buyer,'Molduras: oferta exclusiva de '.$f['name'].'. Confira o preço e confirme a compra na Galeria.');
+        if($buyer!==null)$this->g->notify($buyer,'Molduras: oferta exclusiva de '.$f['name'].'. Confira o preço e confirme a compra nas Pendências.');
         return ['offer_id'=>$id,'version'=>(string)$v,'amount'=>$amount,'asset'=>$asset,'buyer_id'=>$buyer===null?null:(string)$buyer,'checkout_blocked'=>$this->busy((int)$f['id'])];
     }
     public function cancelOffer(int $actor,array $d): array {

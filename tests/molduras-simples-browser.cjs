@@ -18,7 +18,7 @@ if(!password||!adminPassword)throw Error('Defina as senhas privadas da demonstra
  const page=async c=>{const p=await c.newPage();p.on('pageerror',e=>errors.push(e.message));return p;};
  const open=async p=>{await p.goto(`${origin}${prefix}/index.php?view=galeria`);await p.waitForSelector('.mld-simple');};
  const tab=async(p,id)=>{await p.locator(`[data-mld-action=tab][data-id="${id}"]`).click();await p.waitForFunction(()=>!document.querySelector('#mld-content')?.textContent.includes('Carregando…'));};
- const submit=async(form,admin=false)=>{if(admin)await form.locator('[name=password]').fill(adminPassword);if(await form.locator('[name=confirm]').count())await form.locator('[name=confirm]').check();await form.locator('button[type=submit]').click();};
+ const submit=async(form,admin=false)=>{await form.waitFor({state:'visible'});if(admin)await form.locator('[name=password]').fill(adminPassword);if(await form.locator('[name=confirm]').count())await form.locator('[name=confirm]').check();await form.locator('button[type=submit]').click();};
  const done=async p=>p.waitForFunction(()=>!document.querySelector('#dialog').open);
  const close=async p=>{if(await p.locator('dialog[open]').count())await p.locator('dialog [data-action=close]').click();};
  const cleanForm=async p=>assert.equal(await p.locator('dialog input[type="datetime-local"],dialog input[type=date],dialog [name=space_id],dialog [name=point_id],dialog [name=policy_id],dialog [name=x]').count(),0);
