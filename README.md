@@ -11,10 +11,11 @@ Aplicação PHP/MySQL para mercado de arte com **moeda exclusivamente simulada**
 - Anúncios, busca, perfis, propostas, contrapropostas, aprovação por versão, reservas próprias e liquidação bilateral atômica.
 - Cortes consistentes, processamento recuperável em lotes, direitos brutos por maiores restos, aceitação explícita e taxa independente.
 - Administração, histórico, notificações, feed público autorizado, interface móvel, PWA e página offline sem operações automáticas.
+- Galeria/Molduras: catálogo físico, aquisição e revenda negociada, coalizões bilaterais com cotas canônicas, eventos financiados, votação credenciada, apuração, ranking e painel administrativo. **Desabilitada por padrão**; exige migração 004 e configuração explícita do Admin.
 
 ## Requisitos de execução
 
-PHP **8.3+ de 64 bits**, extensões PDO/PDO MySQL, BCMath, GD, mbstring, fileinfo e OpenSSL; MySQL/InnoDB com utf8mb4. Testado localmente em PHP 8.3.6 e MySQL 8.0.46. MariaDB e a conta específica da Superdomínios não foram verificados. HTTPS em produção e SMTP configurado.
+PHP **8.3+ de 64 bits**, extensões PDO/PDO MySQL, BCMath, GD, mbstring, fileinfo e OpenSSL; MySQL/InnoDB com utf8mb4. Galeria verificada localmente em PHP 8.3.36 e MySQL 8.0.46. MariaDB e a conta específica da Superdomínios não foram verificados. HTTPS em produção e SMTP configurado.
 
 **Não há Node, Docker, Composer, Redis, WebSockets ou serviço externo obrigatório em produção.** PHPMailer 6.10.0 e a fonte Inter estão incluídos; não há dependências de CDN na aplicação. Node/Playwright são ferramentas opcionais de teste local.
 
@@ -37,6 +38,8 @@ Guia completo: [docs/DEPLOY_SUPERDOMINIOS.md](docs/DEPLOY_SUPERDOMINIOS.md).
 No repositório GitHub, a pasta `downloads/` contém o **ZIP de produção** e o **ZIP completo**, com hashes SHA-256. Abra o arquivo desejado e clique em **Download raw file**. O ZIP de produção inclui a aplicação, SQL, dependências e documentação; o completo inclui também testes e gerador de demonstração. Ambos excluem configurações privadas e dados locais. Os pacotes não incluem a própria pasta de downloads.
 
 Para baixar a versão atual de todo o código pelo GitHub, use **Code → Download ZIP**. Esse download inclui os testes; siga o guia para servir somente `public/`.
+
+Para atualizar uma instalação existente com Galeria, use [Piscina_Galeria_Molduras.zip](downloads/Piscina_Galeria_Molduras.zip) e siga [o guia específico da Superdomínios](docs/GALERIA_DEPLOY.md). Aplique a migração 004 **antes** dos arquivos integrados. Preserve a configuração privada e os dados; não reaplique pacotes incrementais antigos após essa atualização.
 
 ## Demonstração local opcional
 
@@ -64,7 +67,7 @@ Suíte de integridade: copie a configuração para um arquivo privado `tests/loc
 PISCINA_CONFIG=/CAMINHO/tests/local.php php tests/run.php
 ```
 
-Há 34 cenários com MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais.
+A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A Galeria acrescenta 30 cenários focados; [o relatório](docs/GALERIA_TESTES.md) distingue as execuções completas das verificações adicionais.
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
@@ -84,6 +87,9 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [Home ilustrada: prévias, responsividade e instalação](docs/HOME_ILUSTRADA.md)
 - [Trocar imagem da NFT pela Administração](docs/TROCAR_IMAGEM_ADMIN.md)
 - [Danger Zone: sanções, custódia e recuperação de senha](docs/DANGER_ZONE.md)
+- [Galeria e Molduras: uso, regras e limites](docs/GALERIA.md)
+- [Galeria: instalação, ativação e suspensão na Superdomínios](docs/GALERIA_DEPLOY.md)
+- [Galeria: testes, demonstração e prévias](docs/GALERIA_TESTES.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 

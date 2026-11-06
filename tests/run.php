@@ -11,6 +11,7 @@ function testKey(): string {return bin2hex(random_bytes(16));}
 function op(int $actor,string $action,array $data,?string $key=null): array {return service()->operation($actor,$action,$data,$key??testKey());}
 function fail(callable $fn,int $status=409): void {try{$fn();}catch(Piscina\Problem $e){assertSame($status,$e->status,$e->getMessage());return;}throw new RuntimeException('Operação devia falhar.');}
 function fresh(): void {
+ db()->pdo->exec('SET timestamp=DEFAULT');
  $db=db();$db->pdo->exec('SET FOREIGN_KEY_CHECKS=0');foreach($db->all('SHOW TABLES')as $row)$db->pdo->exec('DROP TABLE `'.reset($row).'`');$db->pdo->exec('SET FOREIGN_KEY_CHECKS=1');(new Piscina\Installer($db,config()))->migrate();
  $db->run("INSERT INTO users(id,email,password_hash,display_name,role,email_verified_at,created_at) VALUES(1,'admin@local.invalid',?,'Admin','admin',UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))",[password_hash('teste-admin-apenas',PASSWORD_DEFAULT)]);
  op(1,'admin.activate',['confirm'=>true,'rounding'=>'HALF_UP_CENT']);
@@ -28,7 +29,7 @@ function concurrent(array $calls): array {
  $deadline=microtime(true)+10;foreach($procs as [,, $p])while(!is_file($p.'.ready')){if(microtime(true)>$deadline)throw new RuntimeException('Worker não iniciou.');usleep(10000);}touch($barrier);$out=[];
  foreach($procs as [$proc,$pipes,$p]){$raw=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$code=proc_close($proc);if($code||!$raw)throw new RuntimeException('Worker: '.$err);$out[]=json_decode($raw,true,512,JSON_THROW_ON_ERROR);unlink($p);unlink($p.'.ready');}unlink($barrier);return $out;
 }
-function test(string $name,callable $fn): void {global $tests,$failed;$tests++;try{fresh();$fn();foreach(service()->ledger->reconcile() as $kind=>$rows)check(!$rows,'Reconciliação '.$kind.': '.json_encode($rows));echo "PASS $name\n";}catch(Throwable $e){$failed++;echo "FAIL $name: ".$e->getMessage()."\n";}}
+function test(string $name,callable $fn): void {global $tests,$failed;if(getenv('PISCINA_SKIP_GALERIA')&&str_starts_with($name,'Galeria:'))return;if(getenv('PISCINA_TEST_FILTER')&&!str_contains($name,getenv('PISCINA_TEST_FILTER')))return;$tests++;try{fresh();$fn();foreach(service()->ledger->reconcile() as $kind=>$rows)check(!$rows,'Reconciliação '.$kind.': '.json_encode($rows));echo "PASS $name\n";}catch(Throwable $e){$failed++;echo "FAIL $name: ".$e->getMessage()."\n";}}
 test('Aprovação concorrente concede 160000 centavos e uma NFT',function(){$id=pending('Ana');$r=concurrent([['actor'=>1,'action'=>'admin.approve','data'=>['user_id'=>(string)$id]],['actor'=>1,'action'=>'admin.approve','data'=>['user_id'=>(string)$id]]]);check($r[0]['ok']&&$r[1]['ok'],'Ambas retornam concessão única.');assertSame('160000',balance($id,'MR'));assertSame(1,db()->row('SELECT COUNT(*) n FROM nfts WHERE creator_id=?',[$id])['n']);});
 test('Depósito concorrente com mesma chave não duplica; conflito de conteúdo',function(){[$u,$n]=user('Ana');$k=testKey();$calls=array_fill(0,2,['actor'=>$u,'action'=>'nft.deposit','data'=>['nft_id'=>(string)$n],'key'=>$k]);$r=concurrent($calls);assertSame($r[0]['data']['operation_id'],$r[1]['data']['operation_id']);assertSame('1000000000',balance($u,'BYC'));assertSame('1',balance($u,'SHARE'));fail(fn()=>op($u,'nft.deposit',['nft_id'=>'999'],$k));});
 test('Retirada pública em mR$, cotas independentes e redepósito',function(){[$a,$n]=user('Ana');[$b]=user('Bia');op($a,'nft.deposit',['nft_id'=>(string)$n]);withdraw($b,$n);assertSame('1',balance($a,'SHARE'));assertSame('0',balance($b,'SHARE'));assertSame('20000',balance($b,'MR'));op($b,'nft.deposit',['nft_id'=>(string)$n]);assertSame('1',balance($b,'SHARE'));assertSame('1000000000',balance($b,'BYC'));assertSame(2,db()->row('SELECT COUNT(*) n FROM deposits WHERE nft_id=?',[$n])['n']);});
@@ -255,4 +256,5 @@ test('Troca em NFT na piscina não altera economia nem captura calendário atras
  assertSame(0,db()->row('SELECT COUNT(*) n FROM periods')['n']);
 });
 require __DIR__.'/danger-domain.php';
+require __DIR__.'/galeria-domain.php';
 echo "\n$tests cenários, $failed falhas. MySQL ".db()->row('SELECT VERSION() v')['v'].', PHP '.PHP_VERSION."\n";exit($failed?1:0);

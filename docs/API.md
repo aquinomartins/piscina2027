@@ -40,13 +40,18 @@ Tokens aleatórios têm hash SHA-256 armazenado, validade de 24h para e-mail e 1
 | dashboard | offset | Autor; saldos disponíveis/reservados, obras, propostas, direitos, taxas, lançamentos e notificações |
 | proposal | id | Somente comprador/vendedor; versões e aprovações |
 | quote | nft_id | Aprovado; custo MR/BYC, versão, vencimento de 5 minutos |
-| operation | id **ou** action e key | Somente autor da operação; resultado já comprometido ou 404 unknown |
+| operation | id **ou** operation_action e key | Somente autor da operação; resultado já comprometido ou 404 unknown |
 | admin | q, status, offset | Somente administrador; usuários paginados com saldos e custódia, regras, períodos, livro agregado, auditoria e reconciliação |
 | admin.wallet | user_id, offset | Somente administrador; carteira e extrato contábil de um participante, até 24 lançamentos por página |
 | admin.nft | nft_id | Somente administrador; consulta da NFT e versão de edição para troca de imagem |
 | admin.nft.image_result | key | Somente administrador/autor; recibo da troca de imagem, sem novo upload |
 
 Página padrão: 24 itens; busca limitada a 80 caracteres. Dashboard usa mesma paginação para histórico/propostas/direitos/taxas. Acesso por troca de ID a proposta/operação privada é recusado. `image.php?id=ID&thumb=1` entrega JPEG associado ou placeholder; imagens não são executáveis.
+
+Recibo por chave: `?action=operation&operation_action=galeria.buy&key=CHAVE`.
+Não duplique o parâmetro `action`. Clientes PWA antigos com o formato duplicado
+são reconhecidos exclusivamente como consulta GET do recibo do próprio autor;
+essa compatibilidade não executa a ação contida no parâmetro.
 
 ## NFTs
 
@@ -94,6 +99,55 @@ Todas as mutações abaixo exigem role admin, CSRF, **password atual** e chave e
 | admin.tasks | {} além da senha; usa o mesmo serviço de cron finito |
 
 A ativação não escolhe primeiro corte. Parâmetros geram novas versões, sem reescrever direitos/obrigações ou versões de propostas. Calendário iniciado é imutável nesta primeira versão. Admin não aprova em nome de outra parte nem possui editor arbitrário de saldo.
+
+## Galeria / Molduras
+
+Migração 004 obrigatória. `galeria.enabled=false` por padrão; o servidor bloqueia
+novos negócios mesmo se um cliente enviar comandos diretamente. Suspensão de
+novas contratações preserva consultas e resolução dos compromissos existentes.
+
+| GET ação | Acesso e parâmetros |
+|---|---|
+| galeria.status | Público; habilitação, suspensão e disponibilidade da entrada de navegação |
+| galeria.catalog | Público; `q`, `space_id`, `offset` |
+| galeria.frame | Público para Molduras publicadas; `id`, `offset`; Admin vê rascunhos |
+| galeria.events / galeria.event | Público; `offset` ou `id`; sem parciais durante votação |
+| galeria.ranking | Público; `from`, `to`, `space_id`, `offset`; versão de métrica explícita |
+| galeria.mine | Somente autor; `offset`, saldos/contratos/propostas/extrato próprios |
+| galeria.proposal / galeria.trade.proposal | Partes e Admin; `id`; versões/aceites imutáveis |
+| admin.galeria | Somente Admin; `section`, `offset`, filtros de período/espaço |
+
+Prévia POST `galeria.preview` (exposição) ou `galeria.trade.preview` (revenda)
+exige sessão e CSRF. Retorna termos completos e `terms_hash` calculado no
+servidor; não cobra nem reserva. Mutações exigem também `Idempotency-Key`.
+Proposta/contraproposta/aceite exigem a versão/hash atual e confirmação explícita.
+
+Comandos participantes: `galeria.buy`, `galeria.offer`,
+`galeria.offer.cancel`, `galeria.trade.propose/counter/accept/reject`,
+`galeria.propose/counter/accept/reject/cancel` e `galeria.vote`.
+O ator vem da sessão; não se escolhe pagador ou eleitor no corpo. O voto aceita
+`event_id`, `candidate_id`, `confirm=true`; não há peso informado pelo cliente.
+
+Comandos `admin.galeria.*`: `settings`, `space.save`, `point.save`,
+`frame.save/allocate/verify/archive/delete/photo_upload`, `block`, `policy`,
+`offer`, `offer.cancel`, `exposure.confirm/complete/suspend/resolve`,
+`event.save/publish/fund/prepare/open/credential/close/reopen/finalize/settle/cancel/resolve`,
+`vote.invalidate`, `incident` e a tarefa limitada `tick`.
+Exigem Admin, senha atual, motivo, confirmação e chave. A confirmação de senha
+exclusiva da Galeria limita falhas; os limites anteriores de Auth permanecem.
+Upload é multipart com MIME real/reencodificação; o comando interno
+`frame.photo` não é acessível diretamente pela API.
+
+O credenciamento usa `event_id`, `user_id`, `credential_ref`; a referência não
+é retida em texto em auditoria/operações, mas em HMAC com segredo privado.
+Eleitores e escolhas não são associados nas consultas administrativas de votos.
+`galeria-media.php?photo_id=ID` entrega fotografia publicada; `?candidate_id=ID`
+entrega a mídia congelada somente quando a candidatura/evento permite. Ambos
+usam controle de acesso, `no-store` e JPEG, sem expor caminhos privados.
+
+Campos e fluxos da interface: [GALERIA.md](GALERIA.md).
+Esquema: `database/migrations/004_galeria.sql`. Os formulários do módulo enviam
+os campos do cadastro e revalidam regras, propriedade e saldo no servidor.
 
 ## Cron HTTP opcional
 

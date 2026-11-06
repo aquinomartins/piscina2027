@@ -13,6 +13,8 @@ FILES = (
 
 
 def main():
+    if (ROOT / 'app/Galeria.php').exists():
+        raise SystemExit('Use tools/build-galeria-update.py: os pacotes anteriores não contêm as dependências da Galeria.')
     required = ('app/AdminDanger.php', 'public/assets/admin-danger.js',
                 'database/migrations/003_admin_danger.sql')
     if not all((ROOT / name).is_file() for name in required):
