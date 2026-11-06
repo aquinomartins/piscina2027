@@ -24,17 +24,25 @@ final class Queries {
         $u['listings']=$db->all("SELECT l.*,n.title nft_title FROM listings l LEFT JOIN nfts n ON n.id=l.nft_id WHERE l.user_id=? AND l.state='ACTIVE' AND l.expires_at>UTC_TIMESTAMP(6) ORDER BY l.id DESC LIMIT 24",[$id]);return $u;
     }
     public function dashboard(int $actor,array $d=[]): array {
+        if(!$this->domain->db->pdo->inTransaction()){
+            // Leitura coerente entre patrimônio, versões e contadores, sem tomar o gate.
+            $this->domain->db->pdo->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+            return $this->domain->db->transaction(fn()=>$this->dashboard($actor,$d));
+        }
         $db=$this->domain->db;$u=$this->domain->user($actor);[$off,$limit]=$this->paging($d);
-        $nfts=$db->all('SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,n.image_path IS NOT NULL image_ready,'.NftImage::SQL_VERSION.' image_version,n.reserved_proposal IS NOT NULL reserved FROM nfts n WHERE state<>\'CUSTODY\' AND (owner_id=? OR (creator_id=? AND image_path IS NULL)) ORDER BY n.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
+        $onlyRights=($d['section']??'')==='pending'?" AND r.state='PENDING'":'';$onlyFees=($d['section']??'')==='pending'?" AND f.state='PENDING'":'';
+        $nfts=$db->all('SELECT n.id,n.title,n.state,n.creator_id,n.owner_id,(SELECT display_name FROM users WHERE id=n.creator_id) creator_name,(SELECT display_name FROM users WHERE id=n.owner_id) owner_name,n.image_path IS NOT NULL image_ready,'.NftImage::SQL_VERSION.' image_version,n.reserved_proposal IS NOT NULL reserved FROM nfts n WHERE state<>\'CUSTODY\' AND (owner_id=? OR (creator_id=? AND image_path IS NULL)) ORDER BY n.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
         $proposals=$db->all('SELECT p.*,v.asset,v.nft_id,v.quantity,v.unit_price,v.total,v.expires_at,b.display_name buyer_name,s.display_name seller_name FROM proposals p JOIN proposal_versions v ON v.proposal_id=p.id AND v.version=p.current_version JOIN users b ON b.id=p.buyer_id JOIN users s ON s.id=p.seller_id WHERE p.buyer_id=? OR p.seller_id=? ORDER BY p.id DESC LIMIT 24 OFFSET '.$off,[$actor,$actor]);
         $ids=array_column($proposals,'id');$approvals=$ids?$db->all('SELECT a.* FROM approvals a JOIN proposals p ON p.id=a.proposal_id WHERE p.id IN ('.implode(',',array_fill(0,count($ids),'?')).') AND a.version=p.current_version',$ids):[];
-        $rights=$db->all("SELECT r.*,p.cutoff_at,p.nft_count,p.total_shares,p.distribution_total,p.parameter_id,s.shares,par.distribution_base FROM rights r JOIN periods p ON p.id=r.period_id JOIN period_snapshots s ON s.period_id=r.period_id AND s.user_id=r.user_id JOIN parameter_versions par ON par.id=p.parameter_id WHERE r.user_id=? AND p.state='PUBLISHED' ORDER BY r.id DESC LIMIT 24 OFFSET $off",[$actor]);
-        $fees=$db->all("SELECT f.*,p.cutoff_at,p.parameter_id FROM fees f JOIN periods p ON p.id=f.period_id WHERE f.user_id=? AND p.state='PUBLISHED' ORDER BY f.id DESC LIMIT 24 OFFSET $off",[$actor]);
+        $rights=$db->all("SELECT r.*,p.cutoff_at,p.nft_count,p.total_shares,p.distribution_total,p.parameter_id,s.shares,par.distribution_base FROM rights r JOIN periods p ON p.id=r.period_id JOIN period_snapshots s ON s.period_id=r.period_id AND s.user_id=r.user_id JOIN parameter_versions par ON par.id=p.parameter_id WHERE r.user_id=? AND p.state='PUBLISHED' $onlyRights ORDER BY r.id DESC LIMIT 24 OFFSET $off",[$actor]);
+        $fees=$db->all("SELECT f.*,p.cutoff_at,p.parameter_id FROM fees f JOIN periods p ON p.id=f.period_id WHERE f.user_id=? AND p.state='PUBLISHED' $onlyFees ORDER BY f.id DESC LIMIT 24 OFFSET $off",[$actor]);
         $history=$db->all("SELECT t.id,t.kind,t.created_at,a.asset,a.purpose,e.amount,t.operation_id FROM ledger_entries e JOIN ledger_transactions t ON t.id=e.transaction_id JOIN accounts a ON a.id=e.account_id WHERE a.user_id=? ORDER BY e.id DESC LIMIT 48 OFFSET $off",[$actor]);
         $notifications=$db->all('SELECT id,message,created_at FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 12',[$actor]);
         $deposits=$db->all('SELECT d.id,d.nft_id,d.created_at,n.title,n.state FROM deposits d JOIN nfts n ON n.id=d.nft_id WHERE d.user_id=? ORDER BY d.id DESC LIMIT 24',[$actor]);
         $totals=$db->row("SELECT (SELECT COALESCE(SUM(r.amount),0) FROM rights r JOIN periods p ON p.id=r.period_id WHERE r.user_id=? AND r.state='PENDING' AND p.state='PUBLISHED') receivable,(SELECT COALESCE(SUM(f.amount),0) FROM fees f JOIN periods p ON p.id=f.period_id WHERE f.user_id=? AND f.state='PENDING' AND p.state='PUBLISHED') due",[$actor,$actor]);
-        return compact('nfts','proposals','approvals','rights','fees','history','notifications','deposits','totals')+['user'=>$u,'balances'=>$this->domain->ledger->balances($actor),'parameters'=>$this->domain->parameters()];
+        $ownedIds=array_column(array_filter($nfts,fn($n)=>(string)$n['owner_id']===(string)$actor),'id');
+        $activity=(new MolduraWallet($this->domain))->read($actor,$d,$ownedIds);
+        return compact('nfts','proposals','approvals','rights','fees','history','notifications','deposits','totals','activity')+['user'=>$u,'balances'=>$this->domain->ledger->balances($actor),'parameters'=>$this->domain->parameters()];
     }
     public function proposal(int $actor,int $id): array {
         $db=$this->domain->db;$p=$db->row('SELECT * FROM proposals WHERE id=? AND (buyer_id=? OR seller_id=?)',[$id,$actor,$actor])??throw new Problem('Proposta privada ou indisponível.',404);
