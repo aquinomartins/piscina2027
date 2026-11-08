@@ -52,6 +52,46 @@ N=0: não há crédito positivo. Q=0: não há divisão/emissão; obrigações c
 
 Aprovar vendedor move BYC/cotas de carteira a sua conta reservada ou marca sua NFT. Aprovar comprador reserva mR$ dele. Proponente não pode reservar bens da contraparte. Versão nova, cancelamento, recusa e expiração liberam só reservas ACTIVE. Liquidação consome essas reservas, transfere ativos e pagamento, com unicidade de settlement. NFT na piscina tem owner NULL e estado POOL; retirada pública passa para PRIVATE/owner do retirante. Cotas não acompanham essa NFT.
 
+## Galeria e Molduras
+
+Módulo incremental com tabelas `galeria_*` da migração 004. Serviços de
+Molduras, negociação, coalizões, eventos e consultas usam os usuários, sessões,
+gate, operação e livro atuais. Não há segundo saldo financeiro. Compra e
+transferência de titularidade compartilham a transação; propostas têm termos
+imutáveis e dois consentimentos da mesma versão.
+
+SHARE de participação fica na conta canônica `galeria_hold` do próprio usuário,
+agregada ao reservado na carteira. Assim continua nos cortes do detentor até
+a captura ao destinatário publicado. `Periods.php` não muda. Prêmios MR/BYC
+vêm de saldo existente e ficam separados por evento; liquidação/devolução
+referencia o livro e a operação. Não há emissão no módulo.
+
+Os ganchos mínimos das operações antigas suspendem exposição/votação afetadas
+sem impedir depósito, retirada ou troca de imagem. `ImageReferences` preserva
+versões de mídia apontadas por auditoria/acordos, inclusive após nova imagem.
+Cancelamento, revisão e custódia preservam origens, versões e lançamentos.
+O cron atual processa lotes limitados, sem criar outro processo permanente.
+
+Flag privada inicialmente falsa e entrada comercial suspensa no banco são
+controles distintos. Após haver compromissos, suspende-se a entrada e mantém-se
+o código para resolução; não se restaura um overlay antigo incompatível.
+Guia e decisões econômicas: [GALERIA.md](GALERIA.md).
+
+A migração 005 acrescenta o protocolo de associação simples separado das tabelas
+de contratos físicos. Não coloca valores fictícios nos campos obrigatórios da
+004 nem converte contratos antigos. Novas Molduras têm metadados de ativo
+(`schema_version=2, mode=asset`) sem equipamento/local obrigatório. As ofertas
+usam as mesmas tabelas e o mesmo ledger; apenas o vencimento passa a ser anulável.
+
+`MolduraLinks` usa gate, propriedade, versões, consentimentos e idempotência
+existentes, sem chamar cobrança, reserva ou emissão. Índices únicos sobre os
+vínculos ativos protegem simultaneamente Moldura e NFT. Mesmo dono usa um aceite;
+partes distintas aceitam a mesma versão. Venda aguarda encerramento consensual.
+Mudança de autoridade suspende sem apagar o acordo; imagens do histórico são
+retidas. `galeria_features` controla disponibilidade futura, enquanto cada
+contrato mantém seus termos versionados. As opções não alteram retroativamente
+um contrato nem tornam o modo simples oneroso.
+
 ## Imutabilidade e reconciliação
 
 A aplicação não oferece UPDATE/DELETE de lançamentos, eventos ou versões concluídas. Runtime SQL deve ter SELECT/INSERT no livro; migração usa credencial temporária com DDL. Administração não tem editor de saldo/propriedade. Reconciliação sob o gate compara agregados com lançamentos, soma por transação/ativo, negativos indevidos, reservas fungíveis/NFT, custódia e reservas de distribuição com direitos pendentes. DBA com privilégios totais ainda pode alterar o banco: isso não é imutabilidade criptográfica. Correções requerem serviço/migração de compensação auditada, nunca apagar o histórico.

@@ -68,8 +68,13 @@ A migração vem primeiro porque os novos controles consultam as novas tabelas. 
 
 - `app/Auth.php`, `Domain.php`, `Ledger.php`, `Queries.php`, `Restrictions.php`, `AdminDanger.php`, `AdminCredentials.php`, `CredentialKey.php`.
 - Integração de imagem: `app/Upload.php`, `AdminImageUpload.php`, `NftImage.php`.
-- `public/api.php`, `public/image.php`.
+- `public/api.php`, `public/image.php`, `public/index.php`.
 - `public/assets/app.js`, `public/assets/admin-danger.js`, `public/assets/app.css`, `public/sw.js`.
+- Home ilustrada: `public/assets/home-hero.css`, `public/assets/piscina-home-1280.webp` e `public/assets/piscina-home-2125.webp`.
+
+O pacote atualizado também inclui a home ilustrada. Envie os recursos estáticos
+antes de `index.php` e deixe `sw.js` por último para que o cache encontre todos
+os arquivos. A atualização preserva o módulo `admin-danger.js` no cache.
 
 Nenhuma edição de `config/local.php` é necessária para habilitar as ações. O pacote também contém este guia e o relatório de testes.
 
