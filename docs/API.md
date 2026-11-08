@@ -37,7 +37,8 @@ Tokens aleatórios têm hash SHA-256 armazenado, validade de 24h para e-mail e 1
 | market | q, state=POOL, offset | Público; NFTs publicadas/piscina, anúncios, busca de pessoas, indicadores, feed concluído |
 | profile | id | Perfil público de aprovado e seus anúncios; sem e-mail/saldo |
 | nft | id | Identidade, criador, titular/custódia, imagem pendente e últimos 50 eventos |
-| dashboard | offset | Autor; saldos disponíveis/reservados, obras, propostas, direitos, taxas, lançamentos e notificações |
+| dashboard | offset, section=dashboard/pending/history | Autor; saldos, ativos e registros existentes, mais activity com Molduras próprias, relações, negociações e contadores |
+| pending.summary | — | Autor; contadores globais needs_action, waiting, negotiations, rights e fees; não conta notificações |
 | proposal | id | Somente comprador/vendedor; versões e aprovações |
 | quote | nft_id | Aprovado; custo MR/BYC, versão, vencimento de 5 minutos |
 | operation | id **ou** operation_action e key | Somente autor da operação; resultado já comprometido ou 404 unknown |
@@ -47,6 +48,22 @@ Tokens aleatórios têm hash SHA-256 armazenado, validade de 24h para e-mail e 1
 | admin.nft.image_result | key | Somente administrador/autor; recibo da troca de imagem, sem novo upload |
 
 Página padrão: 24 itens; busca limitada a 80 caracteres. Dashboard usa mesma paginação para histórico/propostas/direitos/taxas. Acesso por troca de ID a proposta/operação privada é recusado. `image.php?id=ID&thumb=1` entrega JPEG associado ou placeholder; imagens não são executáveis.
+
+`dashboard.activity` é uma projeção privada das tabelas já existentes:
+`frames` contém Molduras próprias paginadas; `relations` contém acordos ligados
+às Molduras/NFTs próprias dessa página. `pending` e `history` usam paginação
+unificada, chaves `kind:id` e a versão corrente de cada negociação. `counts`
+é global, independente da página, e tem a mesma estrutura de `pending.summary`.
+`needs_action` inclui negociações a responder e direitos/taxas pendentes
+publicados; `waiting` conta apenas negociações que aguardam outra pessoa.
+`section` restringe as coleções adicionais carregadas; omiti-la mantém a
+resposta completa. A identidade vem da sessão, nunca de `user_id` na query.
+Essas consultas não criam propostas, contratos, notificações ou lançamentos.
+
+Os recibos de envio/aceite/recusa/cancelamento de Molduras passam a incluir
+`message` e, quando existe próximo respondente, `next_user_id`. A mensagem é
+registrada dentro da mesma transação e recuperada com o recibo idempotente.
+As mutações, termos, permissões e reservas dos protocolos continuam os mesmos.
 
 Recibo por chave: `?action=operation&operation_action=galeria.buy&key=CHAVE`.
 Não duplique o parâmetro `action`. Clientes PWA antigos com o formato duplicado

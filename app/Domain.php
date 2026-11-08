@@ -55,6 +55,7 @@ final class Domain {
                 default=>preg_match('/^(admin\.)?galeria\./D',$action)?(new Galeria($this,$this->op,$this->effective))->apply($actor,$action,$data):throw new Problem('Ação desconhecida.',404)
             };
             (new Galeria($this,$this->op,$this->effective))->reconcileAffected($action,$data);
+            $result+=GaleriaCommunication::result($this,$actor,$action,$result);
             $result['operation_id']=$this->op;
             $this->audit($actor,$action,['input'=>preg_match('/^(admin\.)?galeria\./D',$action)?Galeria::auditInput($data,$action):$data,'result'=>$result]);
             $this->db->run('UPDATE operations SET result=? WHERE id=?',[json_encode($result,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR),$this->op]);

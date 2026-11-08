@@ -1,5 +1,9 @@
 # Atualização de Molduras simples na Superdomínios
 
+> A versão atual também integra Molduras ao Portfólio e às Pendências.
+> Para instalações com 004/005 aplicadas, essa integração atualiza somente
+> arquivos: **não há nova migração**. Siga [MOLDURAS_CARTEIRA.md](MOLDURAS_CARTEIRA.md).
+
 Esta atualização complementa a Galeria da migração 004. Não houve implantação
 ou SQL na hospedagem. O código, as carteiras e os contratos anteriores foram
 preservados em testes isolados; siga esta ordem para atualizar.

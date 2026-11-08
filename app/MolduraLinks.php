@@ -73,7 +73,7 @@ final class MolduraLinks {
             }
             $this->store($id,$v,$actor,$t);$this->g->db->run('UPDATE galeria_settings SET has_commitments=1 WHERE id=1');
             if($t['approval_mode']==='SELF_CONFIRMATION')return $this->activate($this->proposal($id),$t);
-            $this->g->notify((int)$t['frame_user']===$actor?(int)$t['nft_user']:(int)$t['frame_user'],"Molduras: proposta de associação #$id. Confira os percentuais da versão $v.");
+            $this->g->notify((int)$t['frame_user']===$actor?(int)$t['nft_user']:(int)$t['frame_user'],"Molduras: proposta de associação #$id. Confira os percentuais da versão $v nas Pendências.");
             return ['link_proposal_id'=>(string)$id,'version'=>(string)$v,'state'=>'PENDING'];
         }
         GaleriaInput::confirmed($d);$p=$this->proposal(Domain::id($d['link_proposal_id']??null));$this->party($actor,$p,$d);
@@ -113,7 +113,7 @@ final class MolduraLinks {
         if(!in_array((string)$actor,[$a['frame_user'],$a['nft_user']],true))throw new Problem('Associação de terceiros.',403);
         if($a['state']==='ENDED')return ['link_id'=>$a['id'],'state'=>'ENDED'];
         if($a['frame_user']!==$a['nft_user']&&($a['end_requested_by']===null||(int)$a['end_requested_by']===$actor)){
-            if($a['end_requested_by']===null){$this->g->db->run('UPDATE galeria_links SET end_requested_by=? WHERE id=?',[$actor,$a['id']]);$this->g->notify((int)($a['frame_user']===(string)$actor?$a['nft_user']:$a['frame_user']),'Molduras: pedido para encerrar a associação #'.$a['id'].'. Revise e confirme.');}
+            if($a['end_requested_by']===null){$this->g->db->run('UPDATE galeria_links SET end_requested_by=? WHERE id=?',[$actor,$a['id']]);$this->g->notify((int)($a['frame_user']===(string)$actor?$a['nft_user']:$a['frame_user']),'Molduras: pedido para encerrar a associação #'.$a['id'].'. Revise e confirme nas Pendências.');}
             return ['link_id'=>$a['id'],'state'=>'END_REQUESTED'];
         }
         $this->close($a,$actor,'Encerramento confirmado pelos proprietários.');return ['link_id'=>$a['id'],'state'=>'ENDED'];
