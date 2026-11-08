@@ -28,3 +28,5 @@
 .admin-danger-zone form,.admin-danger-zone input{min-width:0;max-width:100%}
 .admin-danger-zone.danger-dialog{margin:0;border:0;padding:0}
 @media(max-width:600px){.admin-danger-zone{padding:14px}.admin-danger-zone .danger-actions{flex-direction:column}.admin-danger-zone .danger-actions button{width:100%}}
+/* Acesso administrativo na navegação móvel, incluindo Galeria e seis destinos. */
+@media(max-width:700px){.mobile-nav a{flex:1 1 0;min-width:44px;grid-template-rows:22px auto;align-content:start}.mobile-nav a[data-view=pending]{flex-grow:1.1}.mobile-nav [data-admin-nav]{flex-grow:1.35}.mobile-nav a>span:first-of-type{max-width:100%;overflow-wrap:anywhere;text-align:center;line-height:1.25}}

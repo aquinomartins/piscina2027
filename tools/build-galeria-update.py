@@ -15,6 +15,7 @@ RUNTIME = sorted(
     )]
 )
 DOCS = (
+    'docs/ADMIN_MOBILE.md',
     'docs/MOLDURAS_CARTEIRA.md', 'docs/MOLDURAS_CARTEIRA_TESTES.md',
     'docs/RESULTADOS_CARTEIRA.txt', 'docs/images/carteira-moldura-mobile.png',
     'docs/images/carteira-nft-mobile.png', 'docs/images/carteira-pendencias-mobile.png',
