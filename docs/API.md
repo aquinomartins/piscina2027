@@ -247,6 +247,49 @@ na resposta completa, com valores históricos. Identidade sempre vem da sessão.
 
 Uso, persistência e atualização: [PREMIOS_ASSOCIACOES.md](PREMIOS_ASSOCIACOES.md).
 
+## Área administrativa de pagamentos de teste (007)
+
+Interface independente: `admin-payments.php`, somente sessão Admin, sem carregar
+SDK externo nas telas normais. Configuração privada `payments_test.enabled=false`
+por padrão, `mode=test`, OAuth verificável com `live_mode=false`. Não há modo de
+produção ou provedor local selecionável nessa área. Integração: Checkout Bricks
+com Payments API v1.
+
+Endpoint exclusivo `admin-payments-api.php?action=...`:
+
+| Método / ação | Campos / comportamento |
+|---|---|
+| GET bootstrap | Admin; habilitação, motivo seguro de bloqueio, Public Key de teste e métodos disponíveis; sem Access Token |
+| GET list | Admin; `offset`; seus testes, saldo canônico dos destinos e acumulado experimental |
+| GET read | Admin/autor; `id`; estado, comprovante e eventos sem dados sensíveis |
+| GET lookup | Admin/autor; `key`; recupera tentativa por chave após perda de resposta |
+| POST create | Admin + CSRF + chave; `amount` decimal, `destination=wallet/treasury/galeria_revenue`, `method=credit_card/debit_card/pix`, `card` tokenizado, `username`, `password`, `confirm=true` |
+| POST refresh | Admin/autor + CSRF; `id`; consulta o provedor sem reenviar cobrança |
+| POST cancel | Admin/autor + CSRF; `id`, `username`, `password`, `confirm=true`; consulta e solicita cancelamento ao provedor |
+| POST abandon | Admin + CSRF; `key`, `username`, `password`, `confirm=true`; bloqueia envio atrasado somente se a tentativa ainda não foi registrada |
+
+O usuário informado deve corresponder ao e-mail do Admin da sessão. A senha
+autoriza o envio, sem aprovar no provedor. `card` aceita somente `token`,
+`payment_method_id`, `issuer_id`, `installments=1` e `payer` de teste com e-mail
+e identificação fictícia. PAN/CVV e campos extras são recusados. Esses dados
+efêmeros não entram em operações, auditoria ou tabelas do módulo.
+
+Estado local `READY_TO_CREDIT` significa aprovação do provedor com lançamento
+ainda não concluído. O crédito e a mudança para `APPROVED` ocorrem juntos no
+livro canônico. Idempotência por tentativa, ID de provedor e referência de
+lançamento protege repetições e concorrência. Não há endpoint público para
+executar `admin.payment_test.credit`; a API geral recusa essa ação interna.
+
+`payment-test-webhook.php` recebe somente POST com assinatura HMAC válida,
+timestamp recente e ID no formato documentado. Não usa sessão/CSRF de usuário:
+a autenticação é a assinatura do provedor. O servidor sempre consulta o recurso;
+o corpo da notificação nunca autoriza saldo. Não há credenciais na URL.
+
+Todos os endpoints retornam JSON sem cache, exceto o Webhook (status simples).
+Recursos de código Pix/QR, se retornados na consulta validada, são efêmeros e
+identificados como teste. Veja [o guia](PAGAMENTOS_MERCADOPAGO_TESTE.md) e
+[os limites da validação](PAGAMENTOS_TESTE_VALIDACAO.md).
+
 ## Cron HTTP opcional
 
 `POST BASE/task.php` fica fechado por padrão. Exige configuração privada `http_tasks.enabled`, hash SHA-256 de bearer aleatório com pelo menos 256 bits; produção exige HTTPS. Headers: `Authorization: Bearer SEGREDO`, `X-Task-Nonce` aleatório de 32–80 caracteres, `X-Task-Timestamp` Unix de 10 dígitos com desvio máximo 90 segundos. Nonce usado fica registrado com hash e repetição é 409. Não colocar segredo na URL. O scheduler precisa enviar esses headers e respeitar o intervalo do plano. Falha após registrar nonce exige nonce novo; o serviço de tarefas retoma por suas unicidades e etapas, sem duplicar distribuição. Preferir CLI.

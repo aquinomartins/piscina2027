@@ -12,9 +12,15 @@ RUNTIME = sorted(
     + ['public/' + name for name in (
         'bootstrap.php', 'api.php', 'index.php', 'image.php', 'galeria-media.php',
         'form.php', 'manifest.php', 'sw.js', 'offline.html',
+        'admin-payments.php', 'admin-payments-api.php', 'payment-test-webhook.php',
     )]
+    + ['bin/check-payment-test.php']
 )
 DOCS = (
+    'docs/PAGAMENTOS_MERCADOPAGO_TESTE.md', 'docs/PAGAMENTOS_TESTE_VALIDACAO.md',
+    'docs/RESULTADOS_PAGAMENTOS_TESTE.txt',
+    'docs/images/pagamento-teste-confirmacao-mobile.png',
+    'docs/images/pagamento-teste-comprovante-mobile.png',
     'docs/PREMIOS_ASSOCIACOES.md', 'docs/PREMIOS_TESTES.md',
     'docs/RESULTADOS_PREMIOS.txt', 'docs/images/premios-registro-mobile.png',
     'docs/images/premios-registro-desktop.png',
@@ -37,6 +43,7 @@ def main():
         'database/migrations/004_galeria.sql',
         'database/migrations/005_molduras_simples.sql',
         'database/migrations/006_premios_associacoes.sql',
+        'database/migrations/007_pagamentos_teste.sql',
     ]
     assert len(files) == len(set(files))
     assert all(not p.startswith(('storage/', 'config/', 'tests/')) for p in files)
@@ -83,7 +90,12 @@ def main():
     (ROOT / 'downloads/PREMIOS_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(prizes.read_bytes()).hexdigest()}  {prizes.name}\n'
     )
-    print(f'{prizes.name}, {wallet.name}, {target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005/006, guias e hashes conferidos.')
+    payments = ROOT / 'downloads/Piscina_Pagamentos_MercadoPago_Teste.zip'
+    shutil.copyfile(target, payments)
+    (ROOT / 'downloads/PAGAMENTOS_TESTE_SHA256SUMS.txt').write_text(
+        f'{hashlib.sha256(payments.read_bytes()).hexdigest()}  {payments.name}\n'
+    )
+    print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, migrações 003/004/005/006/007, guias e hashes conferidos.')
 
 
 if __name__ == '__main__':
