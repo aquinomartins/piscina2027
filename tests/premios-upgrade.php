@@ -1,0 +1,40 @@
+<?php
+declare(strict_types=1);
+if(PHP_SAPI!=='cli')exit(1);
+require dirname(__DIR__).'/app/bootstrap.php';
+if(config()['environment']!=='demo'||!preg_match('/dbname=piscina_test(?:;|$)/',config()['database']['dsn']))throw new RuntimeException('Use somente demo e piscina_test descartável.');
+foreach(['PISCINA_DEMO_ADMIN_PASSWORD','PISCINA_DEMO_PASSWORD'] as $key)if(strlen(getenv($key)?:'')<12)throw new RuntimeException('Defina senhas privadas de demonstração.');
+db()->pdo->exec('CREATE DATABASE IF NOT EXISTS piscina_prize_upgrade CHARACTER SET utf8mb4');
+$cfg=config();$cfg['database']['dsn']=preg_replace('/dbname=piscina_test(?:;|$)/','dbname=piscina_prize_upgrade;',$cfg['database']['dsn']);$b=new Piscina\Database($cfg['database']);
+if($b->all('SHOW TABLES'))throw new RuntimeException('Banco de upgrade deve estar vazio. O teste não apaga registros.');
+$migration=function(string $name)use($b): void {foreach(explode(';',file_get_contents(dirname(__DIR__).'/database/migrations/'.$name.'.sql')) as $sql)if(trim($sql)!=='')$b->pdo->exec($sql);};
+foreach(['001_initial','002_http_tasks','003_admin_danger','004_galeria','005_molduras_simples'] as $name)$migration($name);
+$d=new Piscina\Domain($b,$cfg);$admin=(int)(new Piscina\Installer($b,$cfg))->admin('admin-upgrade@local.invalid','Admin de teste',getenv('PISCINA_DEMO_ADMIN_PASSWORD'));
+$op=fn(int $u,string $action,array $data)=>$d->operation($u,$action,$data,bin2hex(random_bytes(16)));
+$ga=fn(string $action,array $data)=>$op($admin,'admin.galeria.'.$action,$data+['confirm'=>true,'reason'=>'Fixture isolada de upgrade 006']);
+$op($admin,'admin.activate',['confirm'=>true,'rounding'=>'HALF_UP_CENT']);$ga('settings',['accepting'=>true]);$ga('features',['physical'=>true,'events'=>true,'share_charges'=>false]);$people=[];
+foreach(['Ana','Bruno'] as $name){
+ $b->run('INSERT INTO users(email,password_hash,display_name,email_verified_at,created_at) VALUES(?,?,?,UTC_TIMESTAMP(6),UTC_TIMESTAMP(6))',[strtolower($name).'@upgrade.local.invalid',password_hash(getenv('PISCINA_DEMO_PASSWORD'),PASSWORD_DEFAULT),$name]);$u=(int)$b->pdo->lastInsertId();$grant=$op($admin,'admin.approve',['user_id'=>(string)$u]);$n=(int)$grant['nft_id'];$people[$name]=[$u,$n];
+ $dir=$cfg['storage'].'/images';if(!is_dir($dir))mkdir($dir,0700,true);$path=bin2hex(random_bytes(16));$im=imagecreatetruecolor(32,32);imagejpeg($im,$dir.'/'.$path.'.jpg');imagejpeg($im,$dir.'/'.$path.'-thumb.jpg');imagedestroy($im);$op($u,'nft.image',['nft_id'=>(string)$n,'image_path'=>$path.'.jpg','thumbnail_path'=>$path.'-thumb.jpg','image_sha'=>hash_file('sha256',$dir.'/'.$path.'.jpg')]);
+}
+[$ana,$anaNft]=$people['Ana'];[$bruno,$brunoNft]=$people['Bruno'];
+$buy=fn(int $u,array $f)=>$op($u,'galeria.buy',['offer_id'=>$f['offer_id'],'version'=>$f['version'],'amount'=>$f['amount'],'asset'=>$f['asset'],'seller_id'=>null,'confirm'=>true]);
+$frame=$ga('frame.quick',['name'=>'Moldura simples anterior','sale_mode'=>'public','price'=>'250','asset'=>'MR']);$buy($ana,$frame);
+$data=['frame_id'=>$frame['frame_id'],'nft_id'=>(string)$brunoNft,'frame_percent'=>'30','nft_percent'=>'70','conditions'=>'Contrato anterior preservado','confirm'=>true,'license_confirm'=>true];
+$preview=$b->transaction(function()use($b,$d,$ana,$data){$b->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\MolduraLinks(new Piscina\Galeria($d)))->preview($ana,$data);});
+$data['expires_at']=(new DateTimeImmutable($preview['terms']['expires_at'],new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.u\Z');$data['preview_hash']=$preview['preview_hash'];$proposal=$op($ana,'galeria.link.propose',$data);$read=(new Piscina\MolduraLinks(new Piscina\Galeria($d)))->read($bruno,(int)$proposal['link_proposal_id']);
+$op($bruno,'galeria.link.accept',['link_proposal_id'=>$proposal['link_proposal_id'],'version'=>$read['current_version'],'terms_hash'=>$read['versions'][0]['terms_hash'],'confirm'=>true,'license_confirm'=>true]);
+$date=fn(string $when)=>(new DateTimeImmutable($when,new DateTimeZone('UTC')))->format('Y-m-d\TH:i:s.000000\Z');
+$space=$ga('space.save',['name'=>'Espaço original','address'=>'Endereço sintético','responsible'=>'Admin local']);$point=$ga('point.save',['space_id'=>$space['space_id'],'name'=>'Ponto original','authorized_from'=>$date('-1 day'),'authorized_until'=>$date('+30 days'),'conditions'=>'Condições originais']);
+require __DIR__.'/galeria-fixtures.php';
+$physical=$ga('frame.save',['code'=>'ANTERIOR-006','name'=>'Moldura de exposição','type_key'=>'digital','metadata'=>gmetadata()]);$ga('frame.allocate',['frame_id'=>$physical['frame_id'],'point_id'=>$point['point_id'],'starts_at'=>$date('+1 hour'),'ends_at'=>$date('+20 days')]);$ga('frame.verify',['frame_id'=>$physical['frame_id']]);$offer=$ga('offer',['frame_id'=>$physical['frame_id'],'price'=>'100','asset'=>'MR','terms'=>'Oferta anterior','expires_at'=>$date('+7 days')]);$buy($bruno,$offer);
+$policy=$ga('policy',['space_id'=>$space['space_id'],'type_key'=>'digital','x'=>'0','recipient_id'=>(string)$ana,'rights_ack'=>true]);$terms=['frame_id'=>$physical['frame_id'],'nft_id'=>(string)$anaNft,'starts_at'=>$date('+2 days'),'ends_at'=>$date('+3 days'),'expires_at'=>$date('+1 day'),'policy_id'=>$policy['policy_id'],'frame_percent'=>'40','nft_percent'=>'60','obligations'=>'Acordo de exposição anterior','confirm'=>true,'license_confirm'=>true];
+$preview=$b->transaction(function()use($b,$d,$ana,$terms){$b->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\Coalizoes(new Piscina\Galeria($d)))->preview($ana,$terms);});$proposal=$op($ana,'galeria.propose',$terms+['preview_hash'=>$preview['preview_hash']]);$read=(new Piscina\GaleriaQueries($d))->proposal($bruno,(int)$proposal['proposal_id']);$op($bruno,'galeria.accept',['proposal_id'=>$proposal['proposal_id'],'version'=>$read['current_version'],'terms_hash'=>$read['versions'][0]['terms_hash'],'confirm'=>true,'license_confirm'=>true]);
+$event=$ga('event.save',['title'=>'Votação anterior','voting_starts'=>$date('+2 hours'),'voting_ends'=>$date('+3 hours'),'review_hours'=>'24','prize_asset'=>'MR','prize'=>'100','rules'=>'Regulamento original de votação preservado']);$ga('event.publish',['event_id'=>$event['event_id']]);$ga('event.fund',['event_id'=>$event['event_id'],'source'=>'galeria_revenue']);
+$columns=[];$hashes=[];foreach($b->all('SHOW TABLES') as $row){$table=reset($row);if($table==='schema_migrations')continue;$columns[$table]=array_column($b->all("SHOW COLUMNS FROM `$table`"),'Field');$rows=array_map(fn($r)=>json_encode($r,JSON_THROW_ON_ERROR),$b->all("SELECT * FROM `$table`"));sort($rows);$hashes[$table]=hash('sha256',implode("\n",$rows));}
+$migration('006_premios_associacoes');$migration('006_premios_associacoes');
+foreach($hashes as $table=>$before){$cols=implode(',',array_map(fn($c)=>"`$c`",$columns[$table]));$rows=array_map(fn($r)=>json_encode($r,JSON_THROW_ON_ERROR),$b->all("SELECT $cols FROM `$table`"));sort($rows);if($before!==hash('sha256',implode("\n",$rows)))throw new RuntimeException('Dados anteriores alterados: '.$table);}
+if($b->row("SELECT id FROM galeria_events WHERE mode<>'VOTING'"))throw new RuntimeException('Modo original de votação alterado.');
+foreach(['galeria_prize_consents','galeria_prize_acceptances','galeria_prize_awards'] as $table)if($b->row("SELECT * FROM $table LIMIT 1"))throw new RuntimeException('Prêmios ou consentimentos criados pela migração.');
+foreach($d->ledger->reconcile() as $kind=>$rows)if($rows)throw new RuntimeException('Conciliação divergente: '.$kind);
+echo 'PASS Migração 006 aplicada duas vezes; '.count($hashes).' tabelas anteriores preservadas, com carteiras, NFT, Molduras, associação simples ativa, acordo de exposição e prêmio de votação financiado. Modo VOTING preservado; nenhum aditivo ou prêmio criado; conciliação vazia.'.PHP_EOL;

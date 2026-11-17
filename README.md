@@ -12,6 +12,7 @@ Aplicação PHP/MySQL para mercado de arte com **moeda exclusivamente simulada**
 - Cortes consistentes, processamento recuperável em lotes, direitos brutos por maiores restos, aceitação explícita e taxa independente.
 - Administração, histórico, notificações, feed público autorizado, interface móvel, PWA e página offline sem operações automáticas.
 - Galeria/Molduras: criação só com nome, ofertas públicas ou exclusivas, compra/revenda e associação livre com NFTs, percentuais negociáveis e vinculação direta entre ativos do mesmo dono. Associação simples sem cotas, local ou agenda. Fluxo físico, cotas, eventos e ranking preservados como recursos avançados, em stand-by para novas operações. **Galeria desabilitada por padrão**; usa migrações 004/005 e ativação explícita do Admin.
+- Prêmios diretos do Admin para uma associação existente, financiados com contas atuais e divididos automaticamente pelos percentuais contratuais. Exigem aditivo aceito pelos proprietários e migração **006**; prévia, créditos atômicos, proteção contra duplicação e histórico imutável. Prêmios de votação preservados.
 
 ## Requisitos de execução
 
@@ -39,7 +40,7 @@ No repositório GitHub, a pasta `downloads/` contém o **ZIP de produção** e o
 
 Para baixar a versão atual de todo o código pelo GitHub, use **Code → Download ZIP**. Esse download inclui os testes; siga o guia para servir somente `public/`.
 
-Para integrar as Molduras ao Portfólio e às Pendências, use [Piscina_Portfolio_Pendencias.zip](downloads/Piscina_Portfolio_Pendencias.zip) e siga [o guia da integração](docs/MOLDURAS_CARTEIRA.md). **Com 004 e 005 já instaladas, não há nova migração.** Se possui apenas a 004, aplique a 005 antes dos arquivos, conforme [o guia da Galeria na Superdomínios](docs/GALERIA_DEPLOY.md). Preserve a configuração privada e os dados; não reaplique pacotes antigos. Os ZIPs atuais `Piscina_Galeria_Molduras.zip` e `Piscina_Molduras_Simples.zip` contêm o mesmo runtime compatível.
+Para a versão atual com premiação, baixe [Piscina_Premios_Associacoes.zip](downloads/Piscina_Premios_Associacoes.zip) e siga [o guia de instalação e uso](docs/PREMIOS_ASSOCIACOES.md). **Aplique a migração 006**, após 004 e 005. A integração do Portfólio/Pendências da PR #13 não exigia nova migração; a premiação desta versão exige. Os ZIPs atuais `Piscina_Portfolio_Pendencias.zip`, `Piscina_Galeria_Molduras.zip` e `Piscina_Molduras_Simples.zip` contêm o mesmo runtime compatível e a 006. Preserve a configuração privada e os dados; não reaplique pacotes antigos.
 
 ## Demonstração local opcional
 
@@ -67,7 +68,7 @@ Suíte de integridade: copie a configuração para um arquivo privado `tests/loc
 PISCINA_CONFIG=/CAMINHO/tests/local.php php tests/run.php
 ```
 
-A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A verificação inclui regressão integrada de 113 cenários e uma execução final focada de 21 casos simples, após acrescentar a cobertura da revenda negociada. A suíte atual contém 114 casos (63 anteriores, 30 avançados e 21 simples). Resultados e reprodução: [relatório](docs/GALERIA_TESTES.md).
+A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A suíte atual contém 149 casos, incluindo 20 de premiação direta. [Resultados e reprodução dos prêmios](docs/PREMIOS_TESTES.md); [testes anteriores da Galeria](docs/GALERIA_TESTES.md).
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
@@ -94,6 +95,8 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [Galeria: testes, demonstração e prévias](docs/GALERIA_TESTES.md)
 - [Molduras no Portfólio e nas Pendências: uso e instalação](docs/MOLDURAS_CARTEIRA.md)
 - [Integração das carteiras: testes e prévias](docs/MOLDURAS_CARTEIRA_TESTES.md)
+- [Prêmios de associações: uso, aditivo e instalação da 006](docs/PREMIOS_ASSOCIACOES.md)
+- [Prêmios: testes financeiros, concorrência e celular](docs/PREMIOS_TESTES.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 
