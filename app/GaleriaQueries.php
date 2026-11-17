@@ -11,8 +11,9 @@ final class GaleriaQueries {
     public function status(): array {
         $installed=Galeria::installed($this->g->db);$s=$installed?$this->g->db->row('SELECT accepting,has_commitments FROM galeria_settings WHERE id=1'):['accepting'=>'0','has_commitments'=>'0'];
         $simple=MolduraLinks::installed($this->g->db);
-        $legacy=$installed&&(bool)($this->g->db->row('SELECT id FROM galeria_proposals LIMIT 1')??$this->g->db->row('SELECT id FROM galeria_events LIMIT 1'));
-        return ['installed'=>$installed,'simple_installed'=>$simple,'features'=>$this->g->features(),'has_legacy'=>$legacy,'enabled'=>$this->g->enabled(),'accepting'=>$this->g->enabled()&&$s['accepting']==='1','has_commitments'=>$s['has_commitments']==='1'];
+        $prizes=$installed&&GaleriaPremios::installed($this->g->db);
+        $legacy=$installed&&(bool)($this->g->db->row('SELECT id FROM galeria_proposals LIMIT 1')??$this->g->db->row('SELECT id FROM galeria_events'.($prizes?" WHERE mode='VOTING'":'').' LIMIT 1'));
+        return ['installed'=>$installed,'simple_installed'=>$simple,'direct_prizes_installed'=>$prizes,'features'=>$this->g->features(),'has_legacy'=>$legacy,'enabled'=>$this->g->enabled(),'accepting'=>$this->g->enabled()&&$s['accepting']==='1','has_commitments'=>$s['has_commitments']==='1'];
     }
     private function installed(): void {if(!Galeria::installed($this->g->db))throw new Problem('Galeria aguardando instalação da migração 004.',409,'galeria_pending');}
     public function catalog(array $q): array {
@@ -69,10 +70,10 @@ final class GaleriaQueries {
         return ['trades'=>$trades,'frames'=>$frames,'proposals'=>$proposals,'agreements'=>$agreements,'finance'=>$finance,'nfts'=>$nfts,'balances'=>$this->domain->ledger->balances($actor),'status'=>$this->status(),'offset'=>$off];
     }
     public function events(array $q,bool $admin=false): array {
-        $this->installed();return $this->page('SELECT id,title,state,capacity,voting_starts,voting_ends,review_hours,prize_asset,prize_amount,funds_state,closed_at,result_version FROM galeria_events '.($admin?'':"WHERE state<>'DRAFT' ").'ORDER BY id DESC',[],$q);
+        $this->installed();$where=GaleriaPremios::installed($this->g->db)?"mode='VOTING'":'1=1';if(!$admin)$where.=" AND state<>'DRAFT'";return $this->page('SELECT id,title,state,capacity,voting_starts,voting_ends,review_hours,prize_asset,prize_amount,funds_state,closed_at,result_version FROM galeria_events WHERE '.$where.' ORDER BY id DESC',[],$q);
     }
     public function event(int $id,?int $viewer=null,array $q=[]): array {
-        $this->installed();$e=$this->g->db->row('SELECT * FROM galeria_events WHERE id=?',[$id])??throw new Problem('Evento não encontrado.',404);$admin=false;
+        $this->installed();$e=$this->g->db->row('SELECT * FROM galeria_events WHERE id=?',[$id])??throw new Problem('Evento não encontrado.',404);if(($e['mode']??'VOTING')!=='VOTING')throw new Problem('Prêmio direto não é um evento de votação.',404);$admin=false;
         if($viewer)$admin=$this->domain->user($viewer)['role']==='admin';if($e['state']==='DRAFT'&&!$admin)throw new Problem('Evento não encontrado.',404);
         $e['rules']=GaleriaInput::decode($e['rules']);unset($e['source_account']);
         $e['candidates']=$this->g->db->all("SELECT c.id,c.frame_id,c.state,c.snapshot,a.frame_user,a.nft_user,a.nft_id,a.state agreement_state,a.physical_at,a.id agreement_id,a.terms FROM galeria_candidates c JOIN galeria_agreements a ON a.id=c.agreement_id WHERE c.event_id=? AND c.state='VALID' ORDER BY c.id",[$id]);

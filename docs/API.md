@@ -205,6 +205,48 @@ Campos e fluxos da interface: [GALERIA.md](GALERIA.md).
 Esquema: `database/migrations/004_galeria.sql`. Os formulários do módulo enviam
 os campos do cadastro e revalidam regras, propriedade e saldo no servidor.
 
+## Prêmios diretos de associações (006)
+
+Pré-requisitos: migrações 004/005/006; Galeria habilitada para criar prêmios e
+solicitar novos aditivos. Todos os IDs/valores financeiros são retornados em
+strings; percentuais `*_bps` são inteiros (10000 = 100%). Entrada de valor total
+usa decimal com ponto, com até duas casas para MR ou oito para BYC.
+
+| Método / ação | Campos / acesso |
+|---|---|
+| GET galeria.prizes | Admin; `offset`; prêmios DIRECT e saldos disponíveis nas três fontes |
+| GET galeria.prize | Admin; `id`; prêmio e registro histórico, se pago |
+| GET galeria.prize.associations | Admin; `q`, `offset`; associações ativas e estado do aditivo |
+| GET galeria.prize.consent | Partes ou Admin; `id`; termos, hash, aceites e elegibilidade |
+| POST admin.galeria.prize.save | Admin; `title`, `asset=MR/BYC`, `amount`, `reason`, `confirm`, `password` |
+| POST admin.galeria.prize.fund | Admin; `prize_id`, `source=wallet/treasury/galeria_revenue`, `reason`, `confirm`, `password` |
+| POST admin.galeria.prize.cancel | Admin; `prize_id`, `reason`, `confirm`, `password`; devolve à origem, se financiado e ainda não pago |
+| POST admin.galeria.prize.consent.request | Admin; `protocol=simple/physical`, `association_id`, `reason`, `confirm`, `password` |
+| POST galeria.prize.consent.accept / reject | Somente parte real; `consent_id`, `terms_hash`, `confirm` |
+| POST galeria.prize.preview | Admin + CSRF; `prize_id`, `consent_id`; retorna total, partes, percentuais, parcelas, contrato e `preview_hash`; não movimenta saldo |
+| POST admin.galeria.prize.award | Admin; `prize_id`, `consent_id`, `preview_hash`, `reason`, `confirm`, `password` |
+
+Mutações exigem a chave idempotente usual. Não envie percentuais, valores
+individuais ou beneficiários na destinação: campos extras são recusados.
+Prêmio não financiado, aditivo sem todos os aceites, contrato inválido ou prévia
+desatualizada retornam 409. O servidor revalida tudo e debita o escrow/credita
+as carteiras na mesma transação. NFT recebe a parcela truncada e Moldura fica
+com o resíduo, conforme aditivo; a soma equivale ao total.
+
+`galeria_events.mode=DIRECT` fica fora das rotas públicas de eventos de votação.
+Eventos anteriores são `VOTING` e suas rotas recusam o prêmio direto. Unicidade
+por prêmio e o bloqueio econômico protegem requisições com chaves diferentes;
+repetir o mesmo destino após o pagamento retorna o registro já confirmado.
+Trocar o destino de um prêmio pago retorna conflito. Consulte o resultado por
+`operation` com a ação e a chave originais após uma perda de resposta.
+
+`dashboard.activity.pending/history` inclui aditivos como `kind=prize_consent`;
+`needs_action` conta somente quem ainda precisa responder. A projeção privada
+`activity.prize_awards` inclui as premiações recebidas em `section=history` ou
+na resposta completa, com valores históricos. Identidade sempre vem da sessão.
+
+Uso, persistência e atualização: [PREMIOS_ASSOCIACOES.md](PREMIOS_ASSOCIACOES.md).
+
 ## Cron HTTP opcional
 
 `POST BASE/task.php` fica fechado por padrão. Exige configuração privada `http_tasks.enabled`, hash SHA-256 de bearer aleatório com pelo menos 256 bits; produção exige HTTPS. Headers: `Authorization: Bearer SEGREDO`, `X-Task-Nonce` aleatório de 32–80 caracteres, `X-Task-Timestamp` Unix de 10 dígitos com desvio máximo 90 segundos. Nonce usado fica registrado com hash e repetição é 409. Não colocar segredo na URL. O scheduler precisa enviar esses headers e respeitar o intervalo do plano. Falha após registrar nonce exige nonce novo; o serviço de tarefas retoma por suas unicidades e etapas, sem duplicar distribuição. Preferir CLI.

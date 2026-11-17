@@ -15,6 +15,9 @@ RUNTIME = sorted(
     )]
 )
 DOCS = (
+    'docs/PREMIOS_ASSOCIACOES.md', 'docs/PREMIOS_TESTES.md',
+    'docs/RESULTADOS_PREMIOS.txt', 'docs/images/premios-registro-mobile.png',
+    'docs/images/premios-registro-desktop.png',
     'docs/ADMIN_MOBILE.md',
     'docs/MOLDURAS_CARTEIRA.md', 'docs/MOLDURAS_CARTEIRA_TESTES.md',
     'docs/RESULTADOS_CARTEIRA.txt', 'docs/images/carteira-moldura-mobile.png',
@@ -33,6 +36,7 @@ def main():
         'database/migrations/003_admin_danger.sql',
         'database/migrations/004_galeria.sql',
         'database/migrations/005_molduras_simples.sql',
+        'database/migrations/006_premios_associacoes.sql',
     ]
     assert len(files) == len(set(files))
     assert all(not p.startswith(('storage/', 'config/', 'tests/')) for p in files)
@@ -43,6 +47,7 @@ def main():
     assert b'molduras-simples.js' in payload['public/sw.js']
     assert b'molduras-carteira.js' in payload['public/sw.js']
     assert b'molduras-carteira.css' in payload['public/sw.js']
+    assert b'galeria-premios.js' in payload['public/sw.js']
     payload['SHA256SUMS_GALERIA.txt'] = ''.join(
         f'{hashlib.sha256(data).hexdigest()}  {name}\n'
         for name, data in sorted(payload.items())
@@ -73,7 +78,12 @@ def main():
     (ROOT / 'downloads/CARTEIRA_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(wallet.read_bytes()).hexdigest()}  {wallet.name}\n'
     )
-    print(f'{wallet.name}, {target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005, guias e hashes conferidos.')
+    prizes = ROOT / 'downloads/Piscina_Premios_Associacoes.zip'
+    shutil.copyfile(target, prizes)
+    (ROOT / 'downloads/PREMIOS_SHA256SUMS.txt').write_text(
+        f'{hashlib.sha256(prizes.read_bytes()).hexdigest()}  {prizes.name}\n'
+    )
+    print(f'{prizes.name}, {wallet.name}, {target.name} e {simple.name}: {len(RUNTIME)} arquivos de execução, migrações 003/004/005/006, guias e hashes conferidos.')
 
 
 if __name__ == '__main__':

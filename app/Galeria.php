@@ -34,6 +34,13 @@ final class Galeria {
         if(!self::installed($this->db))throw new Problem('Instale a migração 004 antes de usar a Galeria.',503);
         $m=new Molduras($this);$c=new Coalizoes($this);$e=new GaleriaEventos($this);
         return match($action) {
+            'admin.galeria.prize.save'=>(new GaleriaPremios($this))->save($actor,$d),
+            'admin.galeria.prize.fund'=>(new GaleriaPremios($this))->fund($actor,$d),
+            'admin.galeria.prize.cancel'=>(new GaleriaPremios($this))->cancel($actor,$d),
+            'admin.galeria.prize.award'=>(new GaleriaPremios($this))->award($actor,$d),
+            'admin.galeria.prize.consent.request'=>(new PrizeConsents($this))->request($actor,$d),
+            'galeria.prize.consent.accept'=>(new PrizeConsents($this))->respond($actor,$d,true),
+            'galeria.prize.consent.reject'=>(new PrizeConsents($this))->respond($actor,$d,false),
             'admin.galeria.settings'=>$this->settings($actor,$d),
             'admin.galeria.features'=>$this->saveFeatures($actor,$d),
             'admin.galeria.frame.quick'=>$m->quick($actor,$d),

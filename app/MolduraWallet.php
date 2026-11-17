@@ -13,7 +13,8 @@ final class MolduraWallet {
         return ['installed'=>Galeria::installed($this->d->db),'simple_installed'=>MolduraLinks::installed($this->d->db),
             'frames'=>$frames,'relations'=>$related,'counts'=>$counts,
             'pending'=>in_array($section,['','pending'],true)?$activity->page($actor,$q):$empty,
-            'history'=>in_array($section,['','history'],true)?$activity->page($actor,$q,true):$empty];
+            'history'=>in_array($section,['','history'],true)?$activity->page($actor,$q,true):$empty,
+            'prize_awards'=>in_array($section,['','history'],true)?(new GaleriaPremios(new Galeria($this->d)))->history($actor,$q):[]];
     }
     private function frames(int $actor,array $q): array {
         $off=max(0,min(100000,(int)($q['offset']??0)));$simple=MolduraLinks::installed($this->d->db);

@@ -1,5 +1,9 @@
 # Molduras no Portfólio e nas Pendências
 
+> O pacote atual também inclui prêmios diretos: aplique a migração **006**
+> seguindo [PREMIOS_ASSOCIACOES.md](PREMIOS_ASSOCIACOES.md). A integração de
+> carteiras descrita abaixo, isoladamente, não exigia migração além da 005.
+
 Esta atualização integra a Galeria aos locais já usados pelos participantes.
 Não há nova migração: uma instalação que já possui a **004 e a 005** recebe
 somente arquivos. Não é preciso criar outro cron nem alterar a configuração

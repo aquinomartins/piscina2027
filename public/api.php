@@ -19,6 +19,10 @@ try {
             'meta'=>(function() use($auth,$domain,$config,$galeria){$u=null;try{$u=$domain->user($auth->actor());}catch(Piscina\Problem $e){if($e->status!==401) throw $e;}return ['csrf'=>$auth->csrf(),'user'=>$u,'environment'=>$config['environment'],'base_path'=>$config['base_path'],'policy_active'=>$domain->policy()!==null,'galeria'=>$galeria->status(),'policy'=>require PISCINA_APP_ROOT.'/config/policy.php'];})(),
             'galeria.status'=>$galeria->status(),'galeria.catalog'=>$galeria->catalog($_GET),
             'pending.summary'=>(new Piscina\ParticipantActivity($domain))->counts($auth->actor()),
+            'galeria.prizes'=>(new Piscina\GaleriaPremios(new Piscina\Galeria($domain)))->list($auth->actor(),$_GET),
+            'galeria.prize'=>(new Piscina\GaleriaPremios(new Piscina\Galeria($domain)))->read($auth->actor(),Piscina\Domain::id($_GET['id']??null)),
+            'galeria.prize.associations'=>(new Piscina\PrizeAssociations(new Piscina\Galeria($domain)))->search($auth->actor(),$_GET),
+            'galeria.prize.consent'=>(new Piscina\PrizeConsents(new Piscina\Galeria($domain)))->read($auth->actor(),Piscina\Domain::id($_GET['id']??null)),
             'galeria.simple.mine'=>(new Piscina\MolduraSimpleQueries($domain))->mine($auth->actor(),$_GET),
             'galeria.simple.admin'=>(new Piscina\MolduraSimpleQueries($domain))->admin($auth->actor(),$_GET),
             'galeria.people'=>(new Piscina\MolduraSimpleQueries($domain))->people($auth->actor(),$_GET),
@@ -51,6 +55,7 @@ try {
         if(!is_array($data)) throw new Piscina\Problem('Corpo JSON inválido.');
         $result=match($action) {
             'auth.register'=>$auth->register($data),'auth.login'=>$auth->login($data),'auth.logout'=>$auth->logout(),
+            'galeria.prize.preview'=>(function()use($auth,$domain,$data){$actor=$auth->actor();$domain->admin($actor);session_write_close();return $domain->db->transaction(function()use($domain,$actor,$data){$domain->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\GaleriaPremios(new Piscina\Galeria($domain)))->preview($actor,$data);});})(),
             'galeria.preview'=>(function()use($auth,$domain,$data){$actor=$auth->actor();session_write_close();return $domain->db->transaction(function()use($domain,$actor,$data){$domain->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\Coalizoes(new Piscina\Galeria($domain)))->preview($actor,$data);});})(),
             'galeria.trade.preview'=>(function()use($auth,$domain,$data){$actor=$auth->actor();session_write_close();return $domain->db->transaction(function()use($domain,$actor,$data){$domain->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\MolduraTrades(new Piscina\Galeria($domain)))->preview($actor,$data);});})(),
             'galeria.link.preview'=>(function()use($auth,$domain,$data){$actor=$auth->actor();session_write_close();return $domain->db->transaction(function()use($domain,$actor,$data){$domain->db->row('SELECT id FROM economic_gate WHERE id=1 FOR UPDATE');return (new Piscina\MolduraLinks(new Piscina\Galeria($domain)))->preview($actor,$data);});})(),

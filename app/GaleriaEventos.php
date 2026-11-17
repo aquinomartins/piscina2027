@@ -4,7 +4,11 @@ namespace Piscina;
 
 final class GaleriaEventos {
     public function __construct(private Galeria $g){}
-    public function event(int $id): array {return $this->g->db->row('SELECT * FROM galeria_events WHERE id=? FOR UPDATE',[$id])??throw new Problem('Evento não encontrado.',404);}
+    public function event(int $id,bool $voting=true): array {
+        $e=$this->g->db->row('SELECT * FROM galeria_events WHERE id=? FOR UPDATE',[$id])??throw new Problem('Evento não encontrado.',404);
+        if($voting&&($e['mode']??'VOTING')!=='VOTING')throw new Problem('Este prêmio é de destinação direta. Use Prêmios de associações.',409,'prize_mode');
+        return $e;
+    }
     public function save(int $actor,array $d): array {
         $this->g->admin($actor,$d);$title=GaleriaInput::text($d['title']??null,120);
         if(empty($d['event_id']))$this->g->feature('events');
@@ -21,8 +25,8 @@ final class GaleriaEventos {
         $this->g->newBusiness();$this->g->admin($actor,$d);$e=$this->event(Domain::id($d['event_id']??null));if($e['state']!=='DRAFT'||$e['voting_starts']<=$this->g->now)throw new Problem('Evento precisa estar em rascunho e no futuro.',409);
         $this->g->db->run("UPDATE galeria_events SET state='REGISTRATION',published_at=? WHERE id=?",[$this->g->now,$e['id']]);return ['event_id'=>$e['id'],'state'=>'REGISTRATION'];
     }
-    public function fund(int $actor,array $d): array {
-        $this->g->admin($actor,$d);$e=$this->event(Domain::id($d['event_id']??null));if($e['funds_state']==='FUNDED')return ['event_id'=>$e['id'],'state'=>'FUNDED'];
+    public function fund(int $actor,array $d,bool $direct=false): array {
+        $this->g->admin($actor,$d);$e=$this->event(Domain::id($d['event_id']??null),!$direct);if($e['funds_state']==='FUNDED')return ['event_id'=>$e['id'],'state'=>'FUNDED'];
         if(!in_array($e['state'],['DRAFT','REGISTRATION'],true)||$e['funds_state']!=='UNFUNDED')throw new Problem('Evento não pode receber novo financiamento.',409);
         $source=$d['source']??'';
         $account=match($source){'wallet'=>$this->g->finance->userAccount($actor,$e['prize_asset']),'treasury'=>$this->g->domain->ledger->account(null,$e['prize_asset'],'treasury'),'galeria_revenue'=>$this->g->domain->ledger->account(null,$e['prize_asset'],'galeria_revenue'),default=>throw new Problem('Escolha carteira própria, tesouraria ou receitas da Galeria.')};
@@ -114,7 +118,7 @@ final class GaleriaEventos {
         foreach($this->g->db->all('SELECT * FROM galeria_agreements WHERE event_id=?',[$e['id']]) as $a)if($a['funds_state']==='HELD')(new Coalizoes($this->g))->refund($a,$reason,false);
         $this->g->finance->refundPrize($e);$this->g->db->run("UPDATE galeria_events SET state='CANCELLED',resolution_until=NULL WHERE id=?",[$e['id']]);$this->g->incident(null,(int)$e['id'],$reason);
     }
-    public function cancel(int $actor,array $d): array {$reason=$this->g->admin($actor,$d);$e=$this->event(Domain::id($d['event_id']??null));$this->cancelInternal($e,$reason);return ['event_id'=>$e['id'],'state'=>'CANCELLED'];}
+    public function cancel(int $actor,array $d,bool $direct=false): array {$reason=$this->g->admin($actor,$d);$e=$this->event(Domain::id($d['event_id']??null),!$direct);$this->cancelInternal($e,$reason);return ['event_id'=>$e['id'],'state'=>'CANCELLED'];}
     public function suspend(int $id,string $reason): void {
         $e=$this->event($id);if(!in_array($e['state'],['REGISTRATION','PREPARED','VOTING','REVIEW'],true))return;
         $until=(new \DateTimeImmutable($this->g->now))->modify('+'.$e['resolution_hours'].' hours')->format('Y-m-d H:i:s.u');$this->g->db->run("UPDATE galeria_events SET previous_state=state,state='SUSPENDED',resolution_until=? WHERE id=?",[$until,$id]);$this->g->incident(null,$id,$reason);

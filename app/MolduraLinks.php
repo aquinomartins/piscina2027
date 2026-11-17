@@ -145,6 +145,7 @@ final class MolduraLinks {
         unset($p['terms']);$p['versions']=$this->g->db->all('SELECT version,author_id,terms,expires_at,created_at FROM galeria_link_versions WHERE proposal_id=? ORDER BY version DESC LIMIT 100',[$id]);
         foreach($p['versions'] as &$v){$t=GaleriaInput::decode($v['terms']);$v['terms_hash']=hash('sha256',Domain::canonical($t));$v['terms']=GaleriaQueries::terms($t);}unset($v);
         $p['acceptances']=$this->g->db->all('SELECT version,user_id,created_at FROM galeria_link_acceptances WHERE proposal_id=? ORDER BY version,user_id',[$id]);
-        $p['link']=$this->g->db->row('SELECT id,state,created_at,ended_at,end_requested_by,ended_by,end_reason FROM galeria_links WHERE proposal_id=?',[$id]);return $p;
+        $p['link']=$this->g->db->row('SELECT id,state,created_at,ended_at,end_requested_by,ended_by,end_reason FROM galeria_links WHERE proposal_id=?',[$id]);
+        $p['direct_prize_consent']=$p['link']&&GaleriaPremios::installed($this->g->db)?$this->g->db->row('SELECT id,state FROM galeria_prize_consents WHERE association_key=? ORDER BY id DESC LIMIT 1',['simple:'.$p['link']['id']]):null;return $p;
     }
 }
