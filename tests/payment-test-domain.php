@@ -101,6 +101,12 @@ test('Pagamentos teste: consulta recusada não aprova por resposta de criação 
     [$p,$h]=ptfixture();$h->rejectGet=true;$h->failureBody=['error'=>'forbidden'];$r=$p->create(1,ptdata(),testKey());assertSame('UNKNOWN',$r['state']);check($r['provider_id']!==null,'ID da criação preservado.');check(str_contains($r['provider_failure'],'consulta do pagamento'),'Recusa da consulta identificada.');assertSame(0,ptcreditCount());
     $h->rejectGet=false;$after=$p->refresh(1,$r['id']);assertSame('APPROVED',$after['state']);assertSame(null,$after['provider_failure']);assertSame('10001',balance(1,'MR'));$p->refresh(1,$r['id']);assertSame(1,ptcreditCount());assertSame(1,$h->creates);
 });
+test('Pagamentos teste: recusa aninhada registra somente códigos e nomes de campos, sem seus valores',function(){
+    [$p,$h]=ptfixture();$h->rejectPost=true;$private=['TEST-NAO_PERSISTIR_CORPO','privado@local.invalid','PAN_CVV_CPF_PRIVADOS'];
+    $h->failureBody=['error'=>'bad_request','details'=>['cause'=>[['code'=>8,'data'=>['field'=>'notification_url','description'=>'The field notification_url and payer.email are invalid: '.implode(' ',$private),'value'=>implode(' ',$private)]]]]];
+    $r=$p->create(1,ptdata(amount:'999.00'),testKey());assertSame('FAILED',$r['state']);check(str_contains($r['provider_failure'],'Código: 8.'),'Causa aninhada preservada.');check(str_contains($r['provider_failure'],'Campos citados pelo provedor (sem valores):'),'Campos identificados sem valores.');check(str_contains($r['provider_failure'],'notification_url')&&str_contains($r['provider_failure'],'payer.email'),'Campos da causa identificados.');assertSame(0,ptcreditCount());
+    foreach(['payment_test_intents','payment_test_events','operations','audit_events'] as $table){$raw=json_encode(db()->all('SELECT * FROM '.$table));foreach($private as $secret)check(!str_contains($raw,$secret),'Valor privado não deve ser registrado.');}
+});
 test('Pagamentos teste: cancelar tentativa ainda não registrada bloqueia envio atrasado',function(){
     [$p,$h]=ptfixture();$key=testKey();$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);
     $key=testKey();$h->hook=fn()=>$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);

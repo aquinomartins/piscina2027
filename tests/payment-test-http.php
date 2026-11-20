@@ -15,6 +15,7 @@ namespace Piscina {
     function curl_setopt(PaymentTestCurl $curl,int $key,mixed $value): bool {$curl->options[$key]=$value;return true;}
     function curl_exec(PaymentTestCurl $curl): bool {
         if($curl->options[CURLOPT_FOLLOWLOCATION]!==false||$curl->options[CURLOPT_SSL_VERIFYPEER]!==true||$curl->options[CURLOPT_SSL_VERIFYHOST]!==2||$curl->options[CURLOPT_PROTOCOLS]!==CURLPROTO_HTTPS)throw new \RuntimeException('Proteção TLS/redirect alterada.');
+        foreach($GLOBALS['payment_test_http_response']['headers']??[] as $line)($curl->options[CURLOPT_HEADERFUNCTION])($curl,$line);
         ($curl->options[CURLOPT_WRITEFUNCTION])($curl,$GLOBALS['payment_test_http_response']['raw']);
         return $GLOBALS['payment_test_http_response']['ok']??true;
     }
@@ -85,6 +86,17 @@ namespace {
         [400,['error'=>'bad_request','cause'=>[['code'=>2067]]],'2067'],
         [400,['error'=>'bad_request','cause'=>[['code'=>4050]]],'4050'],
         [403,['code'=>'pa_unauthorized_result_from_policies'],'pa_unauthorized_result_from_policies'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>1]]],'1'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>3]]],'3'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>8]]],'8'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>23]]],'23'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>1000]]],'1000'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2002]]],'2002'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2004]]],'2004'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2006]]],'2006'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2007]]],'2007'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2009]]],'2009'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2034]]],'2034'],
     ] as [$status,$body,$code]){
         $GLOBALS['payment_test_http_response']=['status'=>$status,'raw'=>json_encode($body)];
         try{$http->request('GET','/users/me');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!$e instanceof Piscina\MercadoPagoTestFailure)throw new RuntimeException('Falha sem diagnóstico tipado.');$safe($e->diagnostic);if($e->error!=='test_provider_rejected'||$e->status!==422||!str_contains($e->getMessage(),'HTTP: '.$status)||!str_contains($e->getMessage(),'Código: '.$code))throw new RuntimeException('Classificação de recusa alterada.');$diagnostics++;}
@@ -103,6 +115,26 @@ namespace {
     ] as $case){
         $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>json_encode(['error'=>'bad_request','message'=>$case['message']])];
         try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!str_contains($e->getMessage(),$case['expected'])||!str_contains($e->getMessage(),'Código: bad_request'))throw new RuntimeException('Mensagem não classificada com frase fixa.');$diagnostics++;}
+    }
+    foreach([
+        ['body'=>['error'=>'bad_request','details'=>['errors'=>[['code'=>8,'data'=>['field'=>'notification_url','message'=>'Invalid field '.$secret.' '.$email]]]]],'code'=>'8','fields'=>['notification_url']],
+        ['body'=>['error'=>'bad_request','error_description'=>'transaction_amount must be numeric: '.$card],'code'=>'bad_request','fields'=>['transaction_amount']],
+        ['body'=>['error'=>['code'=>1,'details'=>[['path'=>'payer.email','description'=>'Required property '.$email]]]],'code'=>'1','fields'=>['payer.email']],
+        ['body'=>['error'=>'bad_request','cause'=>[['code'=>'bad_request','details'=>[['code'=>2034,'message'=>$secret]]]]],'code'=>'2034','fields'=>[]],
+        ['body'=>['error'=>'bad_request','details'=>['description'=>'Invalid X-Idempotency-Key and installments '.$secret]],'code'=>'bad_request','fields'=>['X-Idempotency-Key','installments']],
+    ] as $case){
+        $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>json_encode($case['body'])];
+        try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\MercadoPagoTestFailure $e){$safe($e->diagnostic);if(!str_contains($e->diagnostic,'Código: '.$case['code'].'.'))throw new RuntimeException('Causa aninhada perdida.');foreach($case['fields'] as $field)if(!str_contains($e->diagnostic,$field))throw new RuntimeException('Nome de campo ausente.');$diagnostics++;}
+    }
+    $requestId='b2494284-839e-4b5c-b412-faf07c0843fe';
+    foreach([
+        ['headers'=>["HTTP/1.1 100 Continue\r\n","X-Request-Id: 00000000-0000-0000-0000-000000000000\r\n","HTTP/2 400\r\n","X-Request-Id: $requestId\r\n","Authorization: Bearer $secret\r\n"],'expected'=>$requestId],
+        ['headers'=>["HTTP/2 400\r\n","X-Request-Id: $secret\r\n"],'expected'=>null],
+        ['headers'=>["HTTP/2 400\r\n","X-Request-Id: $email\r\n"],'expected'=>null],
+        ['headers'=>["HTTP/1.1 100 Continue\r\n","X-Request-Id: $requestId\r\n","HTTP/2 400\r\n"],'expected'=>null],
+    ] as $case){
+        $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>'{"error":"bad_request"}','headers'=>$case['headers']];
+        try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\MercadoPagoTestFailure $e){$safe($e->diagnostic);if($case['expected']!==null&&!str_contains($e->diagnostic,$case['expected'])||$case['expected']===null&&str_contains($e->diagnostic,'x-request-id'))throw new RuntimeException('Referência técnica não foi validada.');$diagnostics++;}
     }
     unset($GLOBALS['payment_test_http_response']);
     echo "PASS Diagnóstico HTTP: $diagnostics verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.\n";

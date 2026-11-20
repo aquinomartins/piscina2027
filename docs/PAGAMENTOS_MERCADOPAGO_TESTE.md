@@ -365,6 +365,42 @@ Reutiliza a migração 007, sem SQL novo e sem trocar configuração ou chaves.
 Os resultados atuais e a distinção entre testes locais e homologação estão
 no [relatório de validação](PAGAMENTOS_TESTE_VALIDACAO.md).
 
+### Se o diagnóstico continuar mostrando somente `bad_request`
+
+Esse código HTTP genérico, mesmo com APRO e o e-mail fictício corretos, ainda
+não identifica qual campo foi recusado. A leitura dos erros foi ampliada:
+
+- Reconhece também os códigos documentados 1, 3, 8, 23, 1000, 2002, 2004,
+  2006, 2007, 2009 e 2034, que antes podiam ficar ocultos por `bad_request`.
+- Percorre estruturas conhecidas como `details`, `errors`, `cause`, `data` e
+  `error_description`, com limites de profundidade, quantidade e tamanho.
+- Mostra somente nomes de campos de lista fechada, sem copiar valores:
+  por exemplo `transaction_amount`, `notification_url` ou `payer.email`.
+- Preserva o `x-request-id` retornado pelo provedor apenas se tiver formato
+  UUID. É uma referência técnica para rastrear a chamada, não o ID de cartão,
+  pagamento, usuário ou uma credencial. Nenhum outro cabeçalho é persistido.
+
+O texto bruto, números de cartão, CVV, CPF, e-mail, senha e chaves continuam
+fora do diagnóstico. A referência técnica não garante que o provedor tenha
+criado ou aprovado um pagamento; a consulta independente continua obrigatória.
+As regras de envio, idempotência, saldo e confirmação financeira não mudaram.
+
+Para instalações que **já mostram “Por que o crédito não foi lançado” e
+persistem `PROVIDER_FAILURE`** (revisão eb32311 ou posterior), baixe
+[Piscina_Detalhes_Erro_MercadoPago.zip](../downloads/Piscina_Detalhes_Erro_MercadoPago.zip).
+Esse pacote exige substituir somente `app/MercadoPagoTestHttp.php`, depois de
+guardar uma cópia. Não exige SQL ou alteração da configuração. Os pacotes
+completos e o conjunto de seis arquivos também incluem esta revisão.
+
+O erro antigo não pode ser reconstituído, pois a resposta original não foi
+guardada. Se estiver `FAILED`, prepare um novo teste de valor pequeno e copie
+o bloco novo, incluindo os campos citados e a referência técnica, quando
+existirem. Em resultado desconhecido, consulte a tentativa original antes
+de iniciar outra. Se continuar sem detalhe reconhecido, a referência pode
+ajudar o suporte do provedor; não presuma uma causa sem essa confirmação.
+
+Referência dos códigos: [Payments API: criar pagamento](https://www.mercadopago.com.br/developers/pt/reference/online-payments/subscriptions/create-payment/post).
+
 ## Arquivos e tabelas
 
 | Grupo | Responsabilidade |

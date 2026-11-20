@@ -169,8 +169,33 @@ def main():
         (ROOT / 'downloads' / sums).write_text(
             f'{hashlib.sha256(target_alias.read_bytes()).hexdigest()}  {alias}\n'
         )
+    mini_package('Piscina_Detalhes_Erro_MercadoPago.zip', 'DETALHES_MP_SHA256SUMS.txt', 'SHA256SUMS_DETALHES_MP.txt', {
+        'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
+        'LEIA_DETALHES_MP.txt': (
+            'Detalhes seguros da recusa do Mercado Pago - PR #16\n\n'
+            'Requer a versao que ja mostra "Por que o credito nao foi lancado"\n'
+            'e conserva PROVIDER_FAILURE no comprovante (revisao eb32311 ou posterior).\n'
+            'Para versoes anteriores, use o pacote Sandbox Bricks completo de seis arquivos.\n\n'
+            '1. Guarde uma copia de app/MercadoPagoTestHttp.php instalado.\n'
+            '2. Substitua SOMENTE esse PHP na raiz privada /home/oftalmol/aquino.bsb.br/.\n'
+            '   Caminho final: /home/oftalmol/aquino.bsb.br/app/MercadoPagoTestHttp.php\n'
+            '3. Recarregue a area. Se a tentativa anterior estiver FAILED, prepare\n'
+            '   um novo teste pequeno com cartao oficial e titular APRO.\n'
+            '   Se o estado for desconhecido, consulte o teste original antes de outro.\n'
+            '4. Em recusa, copie somente o bloco do diagnostico com Etapa, HTTP,\n'
+            '   Codigo, Campos citados sem valores e Referencia tecnica, se retornada.\n\n'
+            'Inclui codigos documentados antes ignorados e causas aninhadas.\n'
+            'Nao salva o corpo bruto nem os valores dos campos do erro.\n'
+            'Somente x-request-id no formato UUID e preservado para rastreio no provedor.\n'
+            'Nao altere config/local.php, chaves, SQL, storage ou saldos.\n'
+            'Nao ativa producao nem aprova localmente o pagamento.\n'
+            'A causa real da recusa ainda precisa ser confirmada na hospedagem.\n'
+            'Respostas do Mercado Pago/SDK foram simuladas apenas nos testes locais.\n'
+        ).encode(),
+    })
     print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, modelo config/example.php, migrações 003/004/005/006/007, guias e hashes conferidos; config/local.php excluído.')
     print('Sandbox Bricks: seis arquivos do módulo, instruções e hashes; nomes antigos entregam o mesmo conjunto completo.')
+    print('Detalhes da recusa: um PHP para instalações que já exibem o diagnóstico no comprovante, com instruções e hashes.')
 
 
 if __name__ == '__main__':

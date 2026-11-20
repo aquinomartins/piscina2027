@@ -303,3 +303,50 @@ usada nesta revisão.** A documentação oficial da Payments API foi consultada;
 os resultados externos foram simulados nos testes. A causa exata da recusa da
 hospedagem e a aprovação real de teste precisam ser verificadas com o novo
 diagnóstico. Não foi repetida a regressão completa de todo o aplicativo.
+
+## Detalhes aninhados, campos e referência técnica — 20/11/2026
+
+Um novo comprovante da hospedagem mostrou recusa em `POST /v1/payments`,
+HTTP 400 e apenas `bad_request`. O usuário confirmou APRO e o e-mail fictício
+esperado. O aviso não basta para atribuir a recusa a um campo ou credencial.
+
+A leitura anterior ignorava códigos documentados como 1, 3, 8, 23 e 2034,
+além de estruturas aninhadas em `details`/`data` e `error_description`. O
+transporte passou a reconhecer esses códigos e percorrer somente estruturas
+de erro conhecidas, com limites. Prefere causas específicas ao código genérico
+e reconstrói os detalhes com frases e nomes de campos de listas fechadas.
+Valores e texto bruto nunca são copiados para o diagnóstico.
+
+O cabeçalho `x-request-id` só é preservado em formato UUID para rastrear a
+requisição no provedor. Respostas intermediárias limpam a referência anterior;
+valores inválidos e outros cabeçalhos são ignorados. Não é ID de recurso,
+credencial ou autorização de pagamento. Sem referência/detalhe reconhecidos,
+o aviso continua sem presumir a causa.
+
+Resultados atuais:
+
+- **39 cenários focados**, PHP 8.3.36/MySQL 8.0.46 reais e provedor controlado;
+  incluem persistência de causa aninhada com nomes de campos e ausência dos
+  valores privados em intenções, eventos, operações e auditoria. Fluxos de
+  crédito, concorrência, rollback, reenvio e permissões continuam passando.
+- **76 verificações HTTP**: 20 de rotas/host e 56 de diagnóstico/privacidade,
+  com cURL interceptado antes da rede. Cobrem códigos antes omitidos, causas
+  aninhadas, campos sem valores, UUID de rastreio, descarte de cabeçalhos
+  sensíveis e referência provisória, além das classificações anteriores.
+- **Dez grupos de navegador**, com PHP/MySQL reais para acesso e API/SDK
+  controlados na UI ativa. A mensagem longa com campos e referência técnica
+  foi exercitada a 360/390/430/1440 px sem overflow ou erros JavaScript, com
+  áreas de toque de pelo menos 44 px, e inspecionada na captura mobile.
+
+Somente `app/MercadoPagoTestHttp.php` mudou no runtime desta revisão. Há um
+minipacote de um PHP para quem já instalou o comprovante com diagnóstico;
+os pacotes completos e o conjunto compatível de seis arquivos também foram
+regenerados. Não há SQL novo nem alteração do corpo financeiro enviado,
+configuração privada, ledger, autorização ou app normal.
+
+**Zero chamadas autenticadas, tokenizações ou pagamentos no Mercado Pago
+neste workspace.** A referência oficial da Payments API foi consultada.
+Os testes usam respostas locais controladas; a causa real do HTTP 400 e o
+crédito após aprovação na hospedagem continuam dependendo de homologação.
+O código não aprova pagamentos localmente nem atribui culpa aos dados do
+usuário só pelo retorno genérico. A regressão de todo o app não foi repetida.
