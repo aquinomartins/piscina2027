@@ -38,6 +38,29 @@ DOCS = (
 )
 
 
+def mini_package(name, sums, manifest, payload):
+    payload = dict(payload)
+    payload[manifest] = ''.join(
+        f'{hashlib.sha256(data).hexdigest()}  {path}\n'
+        for path, data in sorted(payload.items())
+    ).encode()
+    target = ROOT / 'downloads' / name
+    with zipfile.ZipFile(target, 'w') as archive:
+        for path, data in sorted(payload.items()):
+            info = zipfile.ZipInfo(path, (1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED)
+    with zipfile.ZipFile(target) as archive:
+        assert archive.testzip() is None
+        assert set(archive.namelist()) == set(payload)
+        for path, data in payload.items():
+            assert archive.read(path) == data
+    (ROOT / 'downloads' / sums).write_text(
+        f'{hashlib.sha256(target.read_bytes()).hexdigest()}  {target.name}\n'
+    )
+
+
 def main():
     files = RUNTIME + list(CONFIG_MODELS) + list(DOCS) + [
         'database/migrations/003_admin_danger.sql',
@@ -98,8 +121,7 @@ def main():
     (ROOT / 'downloads/PAGAMENTOS_TESTE_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(payments.read_bytes()).hexdigest()}  {payments.name}\n'
     )
-    diagnostic = ROOT / 'downloads/Piscina_Diagnostico_MercadoPago.zip'
-    diagnostic_payload = {
+    mini_package('Piscina_Diagnostico_MercadoPago.zip', 'DIAGNOSTICO_MP_SHA256SUMS.txt', 'SHA256SUMS_DIAGNOSTICO.txt', {
         'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
         'LEIA_DIAGNOSTICO_MP.txt': (
             'Diagnostico seguro do Mercado Pago - modulo da PR #16\n\n'
@@ -112,27 +134,25 @@ def main():
             'Nao precisa alterar config/local.php, banco de dados ou storage para este diagnostico.\n'
             'A mensagem nao exibe corpo bruto, chaves, e-mails, IDs privados ou dados de cartao.\n'
         ).encode(),
-    }
-    diagnostic_payload['SHA256SUMS_DIAGNOSTICO.txt'] = ''.join(
-        f'{hashlib.sha256(data).hexdigest()}  {name}\n'
-        for name, data in sorted(diagnostic_payload.items())
-    ).encode()
-    with zipfile.ZipFile(diagnostic, 'w') as archive:
-        for name, data in sorted(diagnostic_payload.items()):
-            info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
-            info.create_system = 3
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED)
-    with zipfile.ZipFile(diagnostic) as archive:
-        assert archive.testzip() is None
-        assert set(archive.namelist()) == set(diagnostic_payload)
-        for name, data in diagnostic_payload.items():
-            assert archive.read(name) == data
-    (ROOT / 'downloads/DIAGNOSTICO_MP_SHA256SUMS.txt').write_text(
-        f'{hashlib.sha256(diagnostic.read_bytes()).hexdigest()}  {diagnostic.name}\n'
-    )
+    })
+    mini_package('Piscina_Correcao_Cadastro_MercadoPago.zip', 'CADASTRO_MP_SHA256SUMS.txt', 'SHA256SUMS_CADASTRO_MP.txt', {
+        'app/MercadoPagoSandbox.php': payload['app/MercadoPagoSandbox.php'],
+        'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
+        'LEIA_CADASTRO_MP.txt': (
+            'Ajuste do cadastro tecnico de sandbox - modulo da PR #16\n\n'
+            'A requisicao agora envia somente email, no formato curto de sandbox documentado pela API.\n'
+            'O cliente existente e reutilizado sem modificacao. A prova live_mode=false continua obrigatoria.\n'
+            '1. Guarde uma copia dos dois arquivos PHP instalados.\n'
+            '2. Substitua app/MercadoPagoSandbox.php e app/MercadoPagoTestHttp.php na raiz privada\n'
+            '   /home/oftalmol/aquino.bsb.br/.\n'
+            '3. Recarregue Administracao > Pagamentos de teste.\n'
+            '4. Se houver recusa, copie somente o aviso sanitizado com Etapa, HTTP e Codigo.\n\n'
+            'Nao precisa mudar config/local.php, chaves, banco ou storage. Nao ativa producao.\n'
+            'As respostas do provedor foram simuladas nos testes locais; validar na sua conta.\n'
+        ).encode(),
+    })
     print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, modelo config/example.php, migrações 003/004/005/006/007, guias e hashes conferidos; config/local.php excluído.')
-    print(f'{diagnostic.name}: somente app/MercadoPagoTestHttp.php, instruções e hashes.')
+    print('Minipacotes: diagnóstico HTTP e correção do cadastro sandbox, com instruções e hashes.')
 
 
 if __name__ == '__main__':

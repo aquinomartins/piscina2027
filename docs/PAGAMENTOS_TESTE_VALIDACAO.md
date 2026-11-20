@@ -169,3 +169,33 @@ Apenas `app/MercadoPagoTestHttp.php` mudou no runtime. O pacote mínimo de
 diagnóstico e os pacotes atuais foram regenerados. A causa da recusa da conta
 aguarda o aviso sanitizado da hospedagem; não há homologação externa nesta
 revisão e não foram utilizadas credenciais do usuário.
+
+## Cadastro mínimo e detalhes do HTTP 400 — 20/11/2026
+
+A resposta sanitizada da hospedagem localizou `POST /v1/customers`, HTTP 400,
+`bad_request`; a autenticação da conta e a busca já haviam passado. Isso não
+comprova qual campo foi recusado. A alteração de compatibilidade usa somente
+o campo obrigatório `email`, com endereço curto no formato sandbox indicado
+pela API, em vez do endereço gerado mais uma descrição opcional.
+
+O cadastro existente é somente consultado e precisa continuar apresentando
+`live_mode=false`; nenhum cartão, metadata ou dado de cliente é alterado.
+Rotação das chaves exige nova consulta de prova, mesmo ao reutilizar o cliente.
+O formato do fingerprint e a lógica financeira permanecem iguais.
+
+Detalhes conhecidos de `cause`, `causes` e `errors` têm prioridade sobre o
+erro genérico. Frases reconhecidas são classificadas em textos fixos, sem
+devolver mensagens recebidas, campos privados ou segredos. As verificações
+locais injetam segredos nos erros e confirmam sua ausência no diagnóstico.
+
+A homologação da criação do cliente na conta do usuário continua pendente.
+Nenhuma credencial privada foi utilizada neste workspace e não houve chamada
+autenticada ao Mercado Pago por estes testes.
+
+Resultados desta revisão: **35 cenários focados de pagamentos sem falhas**,
+com MySQL 8.0.46/PHP 8.3.36 reais e provedor controlado; incluem reutilização
+sem alterar cliente existente, prova de sandbox e os fluxos de crédito,
+rollback e concorrência anteriores. Mais **20 casos de rotas/host e 35 de
+diagnóstico/privacidade** do transporte, sem conexões externas. O app normal,
+configuração e SQL permanecem iguais. A regressão completa de 183 cenários e
+o navegador foram executados na revisão anterior das credenciais.

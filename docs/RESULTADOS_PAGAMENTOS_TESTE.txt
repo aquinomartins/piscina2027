@@ -452,3 +452,50 @@ PASS Transporte HTTP: 20 verificações de rotas/host, zero conexões externas.
 PASS Diagnóstico HTTP: 26 verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.
 Somente o transporte HTTP foi exercitado nesta revisão. O diagnóstico real aguarda a mensagem sanitizada da hospedagem.
 Nenhuma credencial do usuário, cobrança, alteração de saldo ou SQL na hospedagem.
+
+CADASTRO MÍNIMO DE SANDBOX — 20/11/2026
+Requisição de cliente somente com email curto; diagnóstico prioriza causas específicas sem expor corpo recebido.
+
+REGRESSÃO FOCADA
+PASS Pagamentos teste: flag desativada e política diferente impedem envio e emissão
+PASS Pagamentos teste: OAuth comprova live_mode falso e coletor antes de enviar
+PASS Pagamentos teste: prefixo de teste não substitui atestado do provedor
+PASS Pagamentos teste: Public Key e Access Token habilitam sem Client Secret ou OAuth
+PASS Pagamentos teste: chaves de produção, campos incompletos e pares de outra aplicação falham antes da API
+PASS Pagamentos teste: conta autenticada e país devem corresponder antes da prova de ambiente
+PASS Pagamentos teste: prova não financeira exige booleano live_mode=false antes de criar pagamento
+PASS Pagamentos teste: leitura independente do cadastro técnico precisa confirmar os mesmos dados
+PASS Pagamentos teste: busca inválida ou permissão insuficiente nunca libera pagamento
+PASS Pagamentos teste: resposta perdida do cadastro técnico recupera sem repetir criação
+PASS Pagamentos teste: cache privado contém somente atestado e expiração obriga nova consulta
+PASS Pagamentos teste: troca de Public Key invalida cache e não usa comprovação antiga
+PASS Pagamentos teste: cadastro sandbox existente é somente consultado, sem alteração ou crédito
+PASS Pagamentos teste: configuração OAuth anterior preserva fingerprint e continua exigindo atestado
+PASS Pagamentos teste: nove combinações de meio e destino creditam uma vez no livro canônico
+PASS Pagamentos teste: resposta de criação aprovada e consulta pendente não creditam
+PASS Pagamentos teste: pendência, recusa e cancelamento não alteram saldo
+PASS Pagamentos teste: cartões reais ou de outro ambiente são impedidos antes do POST
+PASS Pagamentos teste: valor, moeda, ambiente, referência e destinatário são conferidos na consulta
+PASS Pagamentos teste: criação repetida e consulta repetida não duplicam saldo
+PASS Pagamentos teste: resposta perdida recupera pela referência sem reenviar pagamento
+PASS Pagamentos teste: ausência de pagamento não vira aprovação local
+PASS Pagamentos teste: cancelar tentativa ainda não registrada bloqueia envio atrasado
+PASS Pagamentos teste: abandonar chave de pagamento existente mostra o registro sem cancelamento fictício
+PASS Pagamentos teste: cancelamento consulta provedor e nunca cancela crédito já aprovado
+PASS Pagamentos teste: falha durante lançamento desfaz todos os créditos e permite conciliação
+PASS Pagamentos teste: conciliações concorrentes usam uma única emissão experimental
+PASS Pagamentos teste: notificação assinada consulta API; corpo e repetição não autorizam saldo
+PASS Pagamentos teste: assinatura falsa, expirada e parâmetros duplicados não consultam provedor
+PASS Pagamentos teste: usuário comum e outro Admin não acessam o pagamento
+PASS Pagamentos teste: revogação de privilégios antes da conciliação impede crédito
+PASS Pagamentos teste: dados sensíveis e destino arbitrário são recusados; registros não guardam token
+PASS Pagamentos teste: números JSON e centavos são exatos sem arredondamento binário
+PASS Pagamentos teste: mudança de credenciais bloqueia consulta e estorno não debita o jogo automaticamente
+PASS Pagamentos teste: crédito experimental financia e paga prêmio pelo fluxo existente
+
+35 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+TRANSPORTE HTTP
+PASS Transporte HTTP: 20 verificações de rotas/host, zero conexões externas.
+PASS Diagnóstico HTTP: 35 verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.
+Nenhuma consulta autenticada ao Mercado Pago neste workspace. Validação na conta ainda pendente.

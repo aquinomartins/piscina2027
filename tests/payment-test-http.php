@@ -78,6 +78,12 @@ namespace {
         [403,['error'=>'forbidden'],'forbidden'],[404,['error'=>'not_found'],'not_found'],
         [405,['cause'=>[['code'=>101]]],'101'],[406,['causes'=>[['code'=>128]]],'128'],
         [422,['error'=>$secret,'message'=>$card],'não informado'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>128,'description'=>$secret.' '.$email]]],'128'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>'unknown_private_code'],['code'=>116,'description'=>$card]]],'116'],
+        [400,['error'=>'bad_request','causes'=>[['code'=>101]]],'101'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>$secret,'description'=>$email]]],'bad_request'],
+        [400,['error'=>'bad_request','cause'=>['code'=>128]],'128'],
+        [400,['error'=>'bad_request','errors'=>[['code'=>125]]],'125'],
     ] as [$status,$body,$code]){
         $GLOBALS['payment_test_http_response']=['status'=>$status,'raw'=>json_encode($body)];
         try{$http->request('GET','/users/me');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if($e->error!=='test_provider_rejected'||$e->status!==422||!str_contains($e->getMessage(),'HTTP: '.$status)||!str_contains($e->getMessage(),'Código: '.$code))throw new RuntimeException('Classificação de recusa alterada.');$diagnostics++;}
@@ -89,6 +95,14 @@ namespace {
     $GLOBALS['payment_test_http_response']=['status'=>200,'raw'=>$secret.' '.$card];
     try{$http->request('GET','/users/me');throw new RuntimeException('Resposta inválida deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if($e->status!==503||$e->error!=='test_provider_invalid'||!str_contains($e->getMessage(),'autenticação da conta'))throw new RuntimeException('JSON inválido sem diagnóstico.');$diagnostics++;}
     $GLOBALS['payment_test_http_response']=['status'=>200,'raw'=>'{"id":12345,"live_mode":false}'];$ok=$http->request('GET','/users/me');if($ok['id']!=='12345'||$ok['live_mode']!==false)throw new RuntimeException('Resposta válida alterada.');$diagnostics++;
+    foreach([
+        ['message'=>'The email format is invalid. '.$secret.' '.$email,'expected'=>'formato de e-mail do cadastro recusado'],
+        ['message'=>'The description is invalid. '.$card,'expected'=>'campo description recusado'],
+        ['message'=>'The customer already exists. '.$secret,'expected'=>'cliente de teste já existente'],
+    ] as $case){
+        $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>json_encode(['error'=>'bad_request','message'=>$case['message']])];
+        try{$http->request('POST','/v1/customers');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!str_contains($e->getMessage(),$case['expected'])||!str_contains($e->getMessage(),'Código: bad_request'))throw new RuntimeException('Mensagem não classificada com frase fixa.');$diagnostics++;}
+    }
     unset($GLOBALS['payment_test_http_response']);
     echo "PASS Diagnóstico HTTP: $diagnostics verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.\n";
 }

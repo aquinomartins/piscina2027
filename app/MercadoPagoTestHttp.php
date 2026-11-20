@@ -34,14 +34,50 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
             $method==='PUT'=>'cancelamento do pagamento (/v1/payments/{id})',
             default=>'consulta do pagamento (/v1/payments/{id})',
         };
-        $code='não informado';
+        $code='não informado';$messages=[];
         try{
             $r=self::decode($raw);
-            $known=['invalid_token','invalid_access_token','unauthorized','unauthorized_client','forbidden','invalid_client','invalid_scope','invalid_grant','invalid_request','unsupported_grant_type','not_found','bad_request','validation_error','invalid_parameters','local_rate_limited','too_many_requests','PA_UNAUTHORIZED_RESULT_FROM_POLICIES','PA_UNAUTHORIZED_RESULT_FROM_AUTHORIZATION'];
+            $known=['invalid_token','invalid_access_token','unauthorized','unauthorized_client','forbidden','invalid_client','invalid_scope','invalid_grant','invalid_request','unsupported_grant_type','not_found','bad_request','validation_error','invalid_parameters','invalid_email','invalid_customer_email','customer_already_exists','local_rate_limited','too_many_requests','PA_UNAUTHORIZED_RESULT_FROM_POLICIES','PA_UNAUTHORIZED_RESULT_FROM_AUTHORIZATION'];
             $known=array_merge($known,array_map('strval',range(100,129)),['140','150','200','201','202','203','204','205','206','207','208','214']);
-            foreach([$r['code']??null,$r['error']??null,$r['cause'][0]['code']??null,$r['causes'][0]['code']??null] as $candidate)if(is_string($candidate)&&in_array($candidate,$known,true)){$code=$candidate;break;}
+            // bad_request genérico não deve esconder uma causa específica, por exemplo 128 (e-mail de teste).
+            $causes=[];$messages[]=$r['message']??null;
+            foreach(['cause','causes','errors'] as $key)if(is_array($r[$key]??null)){
+                $details=array_is_list($r[$key])?$r[$key]:[$r[$key]];
+                foreach(array_slice($details,0,8) as $cause)if(is_array($cause)){$causes[]=$cause['code']??null;$messages[]=$cause['description']??$cause['message']??null;}
+            }
+            foreach([...$causes,$r['code']??null,$r['error']??null] as $candidate)if(is_string($candidate)&&in_array($candidate,$known,true)){$code=$candidate;break;}
         }catch(\Throwable){}
-        return 'Etapa: '.$stage.'. HTTP: '.($status>0?(string)$status:'sem resposta').'. Código: '.$code.'.';
+        $hint=match($code){
+            '101','customer_already_exists'=>' O provedor informou que o cliente já existe.',
+            '106','invalid_email','invalid_customer_email'=>' O provedor recusou o formato do e-mail do cliente.',
+            '107'=>' O provedor recusou o campo first_name.',
+            '108'=>' O provedor recusou o campo last_name.',
+            '116'=>' O provedor recusou o campo description.',
+            '117'=>' O provedor recusou o campo metadata.',
+            '118'=>' O provedor exige um objeto JSON no corpo.',
+            '125'=>' O provedor informou parâmetros inválidos.',
+            '128'=>' O provedor exige e-mail de sandbox no formato test_payer_N@testuser.com.',
+            '150'=>' O provedor informou usuários incompatíveis.',
+            default=>'',
+        };
+        if($hint==='')foreach($messages as $message){
+            if(!is_string($message)||strlen($message)>512)continue;
+            $message=strtolower($message);
+            // Classifique frases conhecidas, mas devolva somente textos fixos; nunca a mensagem recebida.
+            $fixed=[
+                'the email format is invalid'=>'formato de e-mail do cadastro recusado',
+                'the customer already exist'=>'cliente de teste já existente',
+                'the credentials are required'=>'credencial exigida pelo provedor',
+                'the description is invalid'=>'campo description recusado',
+                'the first_name is invalid'=>'campo first_name recusado',
+                'the last_name is invalid'=>'campo last_name recusado',
+                'the body must be a json object'=>'corpo JSON recusado',
+                'invalid users involved'=>'usuários incompatíveis',
+                'the name of the following parameters is wrong'=>'nomes de parâmetros recusados',
+            ];
+            foreach($fixed as $phrase=>$detail)if(str_contains($message,$phrase)){$hint=' Detalhe reconhecido: '.$detail.'.';break 2;}
+        }
+        return 'Etapa: '.$stage.'. HTTP: '.($status>0?(string)$status:'sem resposta').'. Código: '.$code.'.'.$hint;
     }
     // Preserva tokens numéricos JSON como strings decimais, sem passar por ponto flutuante.
     public static function decode(string $raw): array {

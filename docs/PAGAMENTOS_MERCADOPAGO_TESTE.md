@@ -47,7 +47,9 @@ O prefixo `TEST-` é uma barreira inicial, **não é a prova do ambiente**:
 2. O servidor autentica `GET /users/me` e exige o coletor esperado e país `MLB`.
 3. Busca um cadastro técnico fictício na API Clientes; se ainda não existir,
    cria **somente esse cadastro, sem cartão e sem cobrança**, com e-mail
-   `test_payer_N@testuser.com`. O número é estável para a aplicação/conta/chave.
+   `test_payer_1@testuser.com`, dentro do formato sandbox indicado pela API.
+   O POST envia **somente `email`**. Se o cadastro já existir, apenas consulta
+   e confirma o estado; não modifica o cadastro nem seus cartões/metadados.
 4. Exige `live_mode === false` no cadastro e confirma os mesmos dados por
    `GET /v1/customers/{id}` antes de permitir qualquer envio de pagamento.
 
@@ -317,6 +319,26 @@ e compartilhe somente o aviso sanitizado. O pacote tem o arquivo, instruções
 e hashes, sem configuração privada. Não exige SQL, mudanças nas chaves ou
 ativação de produção. A recusa continua bloqueando o módulo; o diagnóstico
 serve para identificar a causa com a resposta real da conta do usuário.
+
+### Ajuste do cadastro técnico após HTTP 400
+
+O aviso da hospedagem identificou HTTP 400 na criação do cadastro técnico;
+autenticação e busca haviam passado. `bad_request` sozinho não identifica o
+campo recusado. O POST foi reduzido a `{"email":"test_payer_1@testuser.com"}`,
+sem descrição opcional e sem o identificador longo gerado anteriormente.
+O endereço atende ao formato `test_payer_[0-9]{1,10}@testuser.com` indicado
+no erro 128 da [referência da API Clientes](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-api-payments/customers/create-customer/post).
+Essa alteração de compatibilidade ainda precisa ser validada na conta.
+
+Quem já instalou o módulo pode aplicar
+[Piscina_Correcao_Cadastro_MercadoPago.zip](../downloads/Piscina_Correcao_Cadastro_MercadoPago.zip),
+substituindo somente `app/MercadoPagoSandbox.php` e `app/MercadoPagoTestHttp.php`
+na raiz privada. Não há SQL novo nem mudança de chaves/configuração. O
+diagnóstico prioriza códigos específicos em `cause`, `causes` ou `errors`
+antes do genérico `bad_request` e traduz algumas frases conhecidas em textos
+fixos seguros; mensagens recebidas e dados sensíveis nunca são devolvidos.
+As exigências de coletor, `live_mode=false`, cartão de teste, consulta do
+pagamento e crédito atômico continuam obrigatórias.
 
 ## Arquivos e tabelas
 

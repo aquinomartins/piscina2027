@@ -49,11 +49,12 @@ final class MercadoPagoSandbox {
             $user=$this->http->request('GET','/users/me',null,$headers);
             if(!is_string($user['id']??null)||$user['id']!==$c['collector_id']||($user['site_id']??'')!=='MLB')throw new Problem('O Mercado Pago não confirmou a conta recebedora brasileira configurada. Nenhum pagamento será enviado.',409,'test_credentials_mismatch');
             // Prova não financeira: o recurso de Clientes informa live_mode. Nunca teste o ambiente criando uma cobrança.
-            $email='test_payer_'.(string)hexdec(substr(hash('sha256',$c['client_id'].':'.$c['collector_id'].':'.$c['public_key']),0,8)).'@testuser.com';
+            // Formato sandbox indicado pela API Clientes (erro 128). Reutilize sem modificar cadastro existente.
+            $email='test_payer_1@testuser.com';
             $path='/v1/customers/search?'.http_build_query(['email'=>$email]);
             $rows=$this->customers($path,$headers);
             if(!$rows){
-                try{$customer=$this->http->request('POST','/v1/customers',json_encode(['email'=>$email,'description'=>'Piscina: verificacao tecnica de teste, sem cartao e sem pagamento'],JSON_THROW_ON_ERROR),$headers);$rows=[$customer];}
+                try{$customer=$this->http->request('POST','/v1/customers',json_encode(['email'=>$email],JSON_THROW_ON_ERROR),$headers);$rows=[$customer];}
                 catch(Problem $e){
                     // Uma resposta perdida ou outro servidor pode ter criado o mesmo cadastro. Não repita o POST.
                     $rows=$this->customers($path,$headers);if(!$rows)throw $e;
