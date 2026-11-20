@@ -136,6 +136,22 @@ namespace {
         $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>'{"error":"bad_request"}','headers'=>$case['headers']];
         try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\MercadoPagoTestFailure $e){$safe($e->diagnostic);if($case['expected']!==null&&!str_contains($e->diagnostic,$case['expected'])||$case['expected']===null&&str_contains($e->diagnostic,'x-request-id'))throw new RuntimeException('Referência técnica não foi validada.');$diagnostics++;}
     }
+    $privateValues=[$secret,$email,$card,'5480 8328 0103 3311','12345678909','a1234567890b1234567890c1234567890d','https://privado.example.com/recurso/12345678','aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'];
+    foreach([
+        ['message'=>'This application is not enabled for test payments.','expected'=>'this application is not enabled for test payments'],
+        ['message'=>'Only production credentials are allowed.','expected'=>'only production credentials are allowed'],
+        ['message'=>'Caller blocked by policy because request header is missing.','expected'=>'caller blocked by policy because request header is missing'],
+        ['message'=>'Unsupported content-type or encoding utf-8.','expected'=>'unsupported content-type or encoding utf-8'],
+        ['message'=>'The account is unavailable for this operation. '.implode(' ',$privateValues),'expected'=>'the account is unavailable for this operation'],
+        ['message'=>implode(' ',$privateValues),'expected'=>null],
+        ['message'=>'invalidPRIVATEVALUE applicationSECRET secretUNKNOWN','expected'=>null],
+    ] as $case){
+        $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>json_encode(['error'=>'bad_request','message'=>$case['message']])];
+        try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\MercadoPagoTestFailure $e){
+            foreach($privateValues as $private)if(str_contains($e->diagnostic,$private))throw new RuntimeException('Valor privado em resumo técnico.');
+            if($case['expected']!==null&&(!str_contains($e->diagnostic,'Termos técnicos da resposta')||!str_contains($e->diagnostic,$case['expected']))||$case['expected']===null&&str_contains($e->diagnostic,'Termos técnicos da resposta'))throw new RuntimeException('Resumo técnico não reconstruído corretamente.');$diagnostics++;
+        }
+    }
     unset($GLOBALS['payment_test_http_response']);
     echo "PASS Diagnóstico HTTP: $diagnostics verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.\n";
 }

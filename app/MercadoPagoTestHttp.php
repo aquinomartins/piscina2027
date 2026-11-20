@@ -127,7 +127,22 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
             ];
             foreach($fixed as $phrase=>$detail)if(str_contains($message,$phrase)){$hint=' Detalhe reconhecido: '.$detail.'.';break 2;}
         }
+        if($hint==='')foreach($messages as $message){$summary=self::technicalTerms($message);if($summary!==''){$hint=' Termos técnicos da resposta (demais termos omitidos): '.$summary.'.';break;}}
         return 'Etapa: '.$stage.'. HTTP: '.($status>0?(string)$status:'sem resposta').'. Código: '.$code.'.'.$hint.($fields?' Campos citados pelo provedor (sem valores): '.implode(', ',$fields).'.':'');
+    }
+    private static function technicalTerms(string $message): string {
+        // Reconstrua com vocabulário fixo; não exiba uma versão parcialmente mascarada do texto bruto.
+        // Consuma tokens inteiros, para não extrair partes de e-mails, chaves, IDs ou valores numéricos.
+        $message=preg_replace('~https?://[^\s<>]+|[^\s<>@]+@[^\s<>@]+~i',' ',$message);
+        preg_match_all('/[A-Za-z0-9_][A-Za-z0-9_.@:\\/-]*/',$message,$matches);
+        $allowed=array_fill_keys(explode(' ','a an the this that these those is are was were be being been do does did not no cannot can could unable must should may for from of on to with without by and or only already because but it its has have had as at than expected got instead invalid valid missing unknown malformed unexpected unsupported required mandatory null empty absent provided sent received failed failure error errors wrong rejected restricted denied unauthorized forbidden permission permissions scope scopes granted token tokens access authorization authentication credentials credential test testing sandbox live production environment mode client application applications app id app_id application_id account accounts user users collector payer seller buyer merchant operator status active inactive enabled disabled blocked registered registration approved approval transaction payment payments method methods credit debit card cards issuer installments installment currency amount value values total refund capture captured acquirer resource endpoint api version feature header headers content content-type encoding charset utf-8 uuid v4 key idempotency security code verification prefix length country site quantity signature public secret private request requests response responses found expired invalidated used process processing support supported owner different same between belong belongs belonging linked associated allowed allow parameter parameters attribute attributes property properties field fields body payload format type types string numeric number boolean array object json parse parsed parsing syntax deserialize deserialization serialize serialization validation validate configuration policy policies agent result results capability capabilities available unavailable marketplace client_id caller_id caller external_reference notification_url transaction_amount payment_method_id payment_type_id issuer_id card_token_id cardtoken_id cardholder_name payer.email payer.identification.number payer.identification.type site_id collector_id sponsor_id application_fee metadata live_mode x-idempotency-key operation operations user-agent user_agent reason reasons connection connections timeout timeouts compatible incompatible validity certificate tls fraud risk prevention'),true);
+        $words=[];$useful=0;$omitted=false;
+        foreach(array_slice($matches[0],0,128) as $word){$word=strtolower(rtrim($word,'.:/'));
+            if(isset($allowed[$word])){if($omitted&&$words)$words[]='…';$omitted=false;$words[]=$word;if(!in_array($word,['a','an','the','this','that','these','those','is','are','was','were','be','being','been','do','does','did','for','from','of','on','to','with','without','by','and','or','only','already','because','but','it','its','has','have','had','as','at','than','request','error','errors'],true))$useful++;}
+            else $omitted=true;
+            if(count($words)>=48)break;
+        }
+        return $useful>=2?implode(' ',$words):'';
     }
     // Preserva tokens numéricos JSON como strings decimais, sem passar por ponto flutuante.
     public static function decode(string $raw): array {

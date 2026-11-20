@@ -401,6 +401,40 @@ ajudar o suporte do provedor; não presuma uma causa sem essa confirmação.
 
 Referência dos códigos: [Payments API: criar pagamento](https://www.mercadopago.com.br/developers/pt/reference/online-payments/subscriptions/create-payment/post).
 
+### Descrições sem frase reconhecida
+
+Quando não houver código ou frase explicativa suficiente, o diagnóstico
+também pode mostrar **Termos técnicos da resposta (demais termos omitidos)**.
+É uma reconstrução com vocabulário fixo, limitada em tamanho. Consome tokens
+inteiros e descarta e-mails, URLs, números e termos fora da lista; não imprime
+uma cópia do texto bruto parcialmente mascarada. Isso pode preservar uma
+explicação técnica curta que as regras anteriores ignoravam, sem guardar os
+valores privados mencionados pelo provedor.
+
+O resumo pode omitir contexto e não é uma instrução para alterar credenciais
+ou ativar produção. Se não houver termos suficientes, nada é inventado. A
+causa precisa ser confirmada pela resposta da API ou pelo suporte do provedor.
+O [minipacote de um PHP](../downloads/Piscina_Detalhes_Erro_MercadoPago.zip)
+também inclui esta revisão; configuração, SQL, corpo enviado e crédito não
+mudam. Descrições antigas descartadas não podem ser recuperadas pelo app.
+
+Com uma referência técnica disponível, também é possível solicitar ao
+suporte que verifique a requisição existente, sem reenviá-la. Informe somente
+o endpoint/método, HTTP/código, `x-request-id`, aplicação e horário aproximado.
+Não envie Access Token, senha ou dados do cartão. Exemplo de texto:
+
+```text
+Integração Checkout Bricks + Payments API v1 com credenciais de teste.
+POST /v1/payments retornou HTTP 400, bad_request.
+Aplicação: NUMERO_PUBLICO_DA_APLICACAO
+x-request-id: REFERENCIA_TECNICA_DO_ERRO
+Horário aproximado de Brasília: DATA_E_HORA
+Qual validação recusou essa requisição no ambiente de teste?
+```
+
+O rastreio pelo provedor não equivale a aprovação ou lançamento no jogo.
+Sem consulta válida de pagamento aprovado, o crédito continua bloqueado.
+
 ## Arquivos e tabelas
 
 | Grupo | Responsabilidade |

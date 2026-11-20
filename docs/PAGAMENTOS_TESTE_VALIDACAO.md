@@ -350,3 +350,40 @@ Os testes usam respostas locais controladas; a causa real do HTTP 400 e o
 crédito após aprovação na hospedagem continuam dependendo de homologação.
 O código não aprova pagamentos localmente nem atribui culpa aos dados do
 usuário só pelo retorno genérico. A regressão de todo o app não foi repetida.
+
+## Resumo por vocabulário técnico — 20/11/2026
+
+Uma tentativa posterior manteve `bad_request`, sem campo ou frase reconhecida,
+mas com referência técnica. A ausência de detalhe no diagnóstico não comprova
+que a API tenha devolvido somente esse código: o módulo ainda descartava
+descrições fora das frases cadastradas. A causa real continua sem confirmação.
+
+Para essas descrições, o transporte passou a reconstruir somente termos
+técnicos de uma lista fixa, na ordem reconhecida, com limites. E-mails e URLs
+são descartados antes de consumir tokens inteiros; números, identificadores,
+chaves e termos fora do vocabulário não são reproduzidos. Partes de um token
+desconhecido não são usadas para reconstruir palavras permitidas. Descrições
+sem conteúdo técnico suficiente continuam sem resumo. O resultado pode omitir
+contexto; não é texto bruto nem orientação para ativar produção.
+
+Verificações desta revisão:
+
+- **40 cenários focados** de pagamentos, PHP 8.3.36/MySQL 8.0.46 reais, com
+  provedor controlado, incluindo persistência do resumo sem segredos e sem
+  crédito após recusa. Continuam passando idempotência, crédito utilizável,
+  concorrência e rollback.
+- **83 verificações HTTP**: 20 de rotas/host e 63 de diagnóstico/privacidade.
+  Sete casos novos cobrem descrições fora das frases conhecidas, remoção de
+  e-mail/URL/PAN/CPF/token/UUID e consumo de palavras inteiras. CURL permanece
+  interceptado no teste CLI, sem conexões externas.
+
+UI e CSS não mudaram; não houve nova execução do navegador. Os dez grupos de
+360/390/430/1440 px foram verificados na revisão anterior aafe55e. A mudança
+de runtime continua restrita a `app/MercadoPagoTestHttp.php`, sem modificar
+configuração privada, SQL, corpo financeiro, regras de aprovação ou ledger.
+O pacote de um PHP e os pacotes completos foram regenerados.
+
+**Nenhuma credencial do usuário ou chamada autenticada ao Mercado Pago foi
+usada.** A causa específica do HTTP 400 e a aprovação de teste na hospedagem
+continuam pendentes. Com a referência técnica, o suporte pode ser consultado
+sobre a requisição existente; nenhuma mensagem foi enviada em nome do usuário.

@@ -107,6 +107,11 @@ test('Pagamentos teste: recusa aninhada registra somente códigos e nomes de cam
     $r=$p->create(1,ptdata(amount:'999.00'),testKey());assertSame('FAILED',$r['state']);check(str_contains($r['provider_failure'],'Código: 8.'),'Causa aninhada preservada.');check(str_contains($r['provider_failure'],'Campos citados pelo provedor (sem valores):'),'Campos identificados sem valores.');check(str_contains($r['provider_failure'],'notification_url')&&str_contains($r['provider_failure'],'payer.email'),'Campos da causa identificados.');assertSame(0,ptcreditCount());
     foreach(['payment_test_intents','payment_test_events','operations','audit_events'] as $table){$raw=json_encode(db()->all('SELECT * FROM '.$table));foreach($private as $secret)check(!str_contains($raw,$secret),'Valor privado não deve ser registrado.');}
 });
+test('Pagamentos teste: descrição desconhecida conserva apenas termos técnicos sem crédito ou valores privados',function(){
+    [$p,$h]=ptfixture();$h->rejectPost=true;$private=['TEST-SEGREDO_PRIVADO','pagador.privado@local.invalid','5480 8328 0103 3311','12345678909','a1234567890b1234567890c1234567890d'];
+    $h->failureBody=['error'=>'bad_request','message'=>'This application is not enabled for test payments. '.implode(' ',$private)];$r=$p->create(1,ptdata(),testKey());assertSame('FAILED',$r['state']);check(str_contains($r['provider_failure'],'this application is not enabled for test payments'),'Somente termos técnicos são preservados.');assertSame(0,ptcreditCount());
+    foreach(['payment_test_intents','payment_test_events','operations','audit_events'] as $table){$raw=json_encode(db()->all('SELECT * FROM '.$table));foreach($private as $secret)check(!str_contains($raw,$secret),'Termos técnicos não preservam valores privados.');}
+});
 test('Pagamentos teste: cancelar tentativa ainda não registrada bloqueia envio atrasado',function(){
     [$p,$h]=ptfixture();$key=testKey();$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);
     $key=testKey();$h->hook=fn()=>$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);
