@@ -20,9 +20,10 @@ Consulta à documentação não equivale à homologação de transações.
 ## Cenários financeiros
 
 `tests/payment-test-domain.php` integra a suíte existente. Cobertura:
-configuração desligada/inconsistente; credenciais diretas, prova não financeira
-com `live_mode=false` e compatibilidade OAuth estrita, sem confiar apenas no
-prefixo; três meios × três destinos; números JSON exatos; ausência de crédito
+configuração desligada/inconsistente; autenticação que libera somente preparar
+o componente; consulta autenticada de token oficial ativo, válido e com
+`live_mode=false`; bloqueio de Pix sem prova recente; compatibilidade OAuth
+estrita, sem confiar apenas no prefixo; três meios × três destinos; números JSON exatos; ausência de crédito
 em pendência/recusa/cancelamento; criação aparentemente aprovada com consulta
 pendente; bloqueio de cartão/ambiente errado e divergências de valor/moeda,
 referência, coletor, método e metadados; resposta perdida; busca por referência;
@@ -81,8 +82,8 @@ Não apaga a base de upgrade ao terminar.
 ## Homologação pendente
 
 Depois de instalar/configurar em ambiente próprio: validar Public Key/Access
-Token TEST, `/users/me` e cadastro técnico na API Clientes com `live_mode=false`
-e coletor esperado; validar OAuth se mantiver o caminho antigo; Card Payment Brick real com cartões
+Token TEST, `/users/me` e consulta do token de cartão com `live_mode=false`,
+estado ativo e validade; validar OAuth se mantiver o caminho antigo; Card Payment Brick real com cartões
 oficiais APRO/OTHE/CONT; disponibilidade real de débito; comportamento do Pix,
 QR retornado e persistência de pendência; consulta por referência; Webhook de
 teste quando entregue; TLS/cURL e limites da Superdomínios; PWA e dispositivo
@@ -104,7 +105,11 @@ comparação dos arquivos de execução com o ZIP anterior. A aplicação e a l�
 de pagamentos não foram modificadas nesta correção de empacotamento. Não houve
 nova transação ou homologação com o Mercado Pago.
 
-## Credenciais diretas de teste — 20/11/2026
+As seções de credenciais/cadastro abaixo preservam resultados de revisões
+anteriores. A dependência da API Clientes foi substituída pelo fluxo descrito
+na última seção; os testes antigos não representam homologação da versão atual.
+
+## Credenciais diretas de teste — 20/11/2026 (histórico)
 
 A tela real da aplicação criada pelo usuário fornece Public Key e Access Token
 de teste. O módulo agora lê esse par de `config/local.php`, sem exigir Client
@@ -141,7 +146,7 @@ O diagnóstico financeiro focado de 34 grupos também passou antes da regressão
 PHP 8.3.36 e MySQL 8.0.46 locais. SQL e lógica financeira existentes não foram
 alterados nesta revisão; nenhum SQL foi executado na hospedagem.
 
-## Diagnóstico de recusa — 20/11/2026
+## Diagnóstico de recusa — 20/11/2026 (histórico)
 
 Um aviso real do Admin mostrou recusa genérica do provedor durante a
 verificação inicial, sem intenção/pagamento registrado. A imagem não indica
@@ -170,7 +175,7 @@ diagnóstico e os pacotes atuais foram regenerados. A causa da recusa da conta
 aguarda o aviso sanitizado da hospedagem; não há homologação externa nesta
 revisão e não foram utilizadas credenciais do usuário.
 
-## Cadastro mínimo e detalhes do HTTP 400 — 20/11/2026
+## Cadastro mínimo e detalhes do HTTP 400 — 20/11/2026 (histórico)
 
 A resposta sanitizada da hospedagem localizou `POST /v1/customers`, HTTP 400,
 `bad_request`; a autenticação da conta e a busca já haviam passado. Isso não
@@ -199,3 +204,50 @@ rollback e concorrência anteriores. Mais **20 casos de rotas/host e 35 de
 diagnóstico/privacidade** do transporte, sem conexões externas. O app normal,
 configuração e SQL permanecem iguais. A regressão completa de 183 cenários e
 o navegador foram executados na revisão anterior das credenciais.
+
+## Fluxo nativo do Bricks após código 150 — 20/11/2026
+
+A hospedagem devolveu código 150, usuários incompatíveis, no cadastro técnico.
+Essa dependência adicional foi retirada: nenhuma rota `/v1/customers` faz
+parte do fluxo atual. Não é necessário criar outro usuário Mercado Pago nem
+ativar produção. A documentação do Bricks orienta credenciais de teste da
+conta real, cartões oficiais e e-mail fictício diferente do vendedor, sem
+contas `testuser.com` como pagador.
+
+`GET /users/me` autentica o coletor brasileiro e permite preparar o componente,
+sem declarar `live_mode=false`. A consulta autenticada do token confirma ID,
+ambiente, estado ativo, validade futura e cartão oficial antes do POST. Public
+Key é conferida quando devolvida, sem exigir um campo opcional ausente nos
+modelos atuais dos SDKs. A prova privada dura até cinco minutos; consulta de
+pagamento de teste do mesmo coletor também a renova. Pix e qualquer mutação
+financeira ficam bloqueados sem essa prova. Essa exigência inicial é uma
+proteção do módulo, não uma exigência geral do Mercado Pago para Pix.
+
+Verificações desta revisão, com PHP 8.3.36 e MySQL 8.0.46 locais:
+
+- **36 cenários de domínio distintos:** execução focada de 35 grupos, mais
+  um caso de aplicação com somente Pix disponível. Incluem recusa de tokens
+  reais/expirados/usados, falta de prova, rotação/expiração do atestado,
+  compatibilidade OAuth, divisão exata, idempotência, concorrência e rollback.
+  O grupo OAuth foi repetido após acrescentar confirmação positiva de crédito
+  pelo caminho anterior, também sem falhas.
+- **52 verificações HTTP:** 20 de rotas/host e 32 de diagnóstico/privacidade,
+  com cURL interceptado no teste CLI e zero conexões externas.
+- **Nove grupos de navegador:** PHP/MySQL reais para autorização e flag
+  desligada; API/SDK controlados para a UI ativa. Cobrem cartão disponível sem
+  prova, Pix inicialmente bloqueado e liberado após comprovação, nove
+  combinações de meio/destino, resumo, estados, recuperação e comprovantes.
+  Chromium a 360/390/430/1440 px sem overflow ou erros JavaScript, botões de
+  pelo menos 44 px e ausência do SDK no app normal.
+
+A regressão completa de 183 cenários pertence à revisão anterior, não foi
+repetida nesta revisão. Os resultados atuais estão anexados ao arquivo de
+resultados; nenhum SQL foi executado na hospedagem. O runtime alterado se
+limita a seis arquivos do módulo opcional/Admin. Configuração privada, esquema,
+rotas e interface do app normal não mudaram.
+
+**Nenhuma chamada autenticada, tokenização, pagamento ou Webhook real foi
+executado com o Mercado Pago neste workspace.** As respostas do provedor/SDK
+foram simuladas somente nos testes. A confirmação do novo fluxo com a conta
+do usuário, incluindo disponibilidade do débito e comportamento real do Pix,
+permanece pendente na hospedagem. Não há aprovação local no runtime.

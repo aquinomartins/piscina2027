@@ -121,38 +121,51 @@ def main():
     (ROOT / 'downloads/PAGAMENTOS_TESTE_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(payments.read_bytes()).hexdigest()}  {payments.name}\n'
     )
-    mini_package('Piscina_Diagnostico_MercadoPago.zip', 'DIAGNOSTICO_MP_SHA256SUMS.txt', 'SHA256SUMS_DIAGNOSTICO.txt', {
-        'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
-        'LEIA_DIAGNOSTICO_MP.txt': (
-            'Diagnostico seguro do Mercado Pago - modulo da PR #16\n\n'
-            'Este pacote melhora a mensagem de erro. Nao libera pagamentos nem retira a prova do sandbox.\n'
-            '1. Guarde uma copia do app/MercadoPagoTestHttp.php instalado.\n'
-            '2. Substitua somente esse arquivo na raiz privada /home/oftalmol/aquino.bsb.br/.\n'
-            '   Caminho final: /home/oftalmol/aquino.bsb.br/app/MercadoPagoTestHttp.php\n'
-            '3. Recarregue Administracao > Pagamentos de teste na Piscina.\n'
-            '4. Copie somente o aviso com Etapa, HTTP e Codigo; nao envie senhas ou tokens.\n\n'
-            'Nao precisa alterar config/local.php, banco de dados ou storage para este diagnostico.\n'
-            'A mensagem nao exibe corpo bruto, chaves, e-mails, IDs privados ou dados de cartao.\n'
-        ).encode(),
-    })
-    mini_package('Piscina_Correcao_Cadastro_MercadoPago.zip', 'CADASTRO_MP_SHA256SUMS.txt', 'SHA256SUMS_CADASTRO_MP.txt', {
-        'app/MercadoPagoSandbox.php': payload['app/MercadoPagoSandbox.php'],
-        'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
-        'LEIA_CADASTRO_MP.txt': (
-            'Ajuste do cadastro tecnico de sandbox - modulo da PR #16\n\n'
-            'A requisicao agora envia somente email, no formato curto de sandbox documentado pela API.\n'
-            'O cliente existente e reutilizado sem modificacao. A prova live_mode=false continua obrigatoria.\n'
-            '1. Guarde uma copia dos dois arquivos PHP instalados.\n'
-            '2. Substitua app/MercadoPagoSandbox.php e app/MercadoPagoTestHttp.php na raiz privada\n'
-            '   /home/oftalmol/aquino.bsb.br/.\n'
-            '3. Recarregue Administracao > Pagamentos de teste.\n'
-            '4. Se houver recusa, copie somente o aviso sanitizado com Etapa, HTTP e Codigo.\n\n'
-            'Nao precisa mudar config/local.php, chaves, banco ou storage. Nao ativa producao.\n'
-            'As respostas do provedor foram simuladas nos testes locais; validar na sua conta.\n'
-        ).encode(),
-    })
+    sandbox_files = (
+        'app/MercadoPagoSandbox.php', 'app/MercadoPagoTestHttp.php',
+        'app/PaymentTests.php', 'public/admin-payments.php',
+        'public/assets/admin-payments.js', 'bin/check-payment-test.php',
+    )
+    sandbox_payload = {path: payload[path] for path in sandbox_files}
+    sandbox_payload['LEIA_SANDBOX_MP.txt'] = (
+        'Fluxo nativo de teste do Checkout Bricks - modulo da PR #16\n\n'
+        'O erro 150 vinha de uma verificacao adicional pela API Clientes.\n'
+        'Esta versao elimina essa dependencia. Atualize os SEIS arquivos juntos.\n'
+        'Requer a PR #16 instalada, incluindo a migracao 007 ja aplicada.\n\n'
+        '1. Guarde uma copia dos seis arquivos instalados.\n'
+        '2. Extraia o pacote na raiz privada /home/oftalmol/aquino.bsb.br/,\n'
+        '   mantendo as pastas app/, public/ e bin/. Nao extraia tudo dentro de public/.\n'
+        '3. No envio manual, atualize primeiro public/assets/admin-payments.js,\n'
+        '   depois os PHP de app/ e bin/, e public/admin-payments.php por ultimo.\n'
+        '4. Recarregue Administracao > Pagamentos de teste. Prepare primeiro um\n'
+        '   cartao de credito oficial de teste; use APRO para testar aprovacao.\n'
+        '   Use e-mail ficticio diferente do vendedor, sem contas testuser.com.\n'
+        '5. Confirme com e-mail e senha do ADMIN DO APP. O servidor consulta\n'
+        '   o token e exige live_mode=false, validade e cartao oficial antes do envio.\n'
+        '6. Pix fica bloqueado ate essa prova, valida por ate cinco minutos,\n'
+        '   ou consulta de pagamento de teste existente do mesmo coletor.\n'
+        '   Essa prova inicial e uma protecao do modulo. Pendencia nao gera credito.\n\n'
+        'Nao precisa mudar config/local.php, credenciais, Webhook, SQL ou storage.\n'
+        'Nao ative producao nem crie contas Mercado Pago para contornar o erro.\n'
+        'Nao use cartoes reais. Nao altere o arquivo privado de prova manualmente.\n'
+        'Credito exige aprovacao confirmada em consulta independente do pagamento.\n'
+        'Provedor/SDK simulados somente nos testes locais; homologar na hospedagem.\n'
+        'Em nova recusa, compartilhe somente o aviso sanitizado, sem segredos.\n'
+    ).encode()
+    sandbox_name = 'Piscina_Sandbox_Bricks_MercadoPago.zip'
+    mini_package(sandbox_name, 'SANDBOX_MP_SHA256SUMS.txt', 'SHA256SUMS_SANDBOX_MP.txt', sandbox_payload)
+    # Nomes antigos passam a entregar o mesmo conjunto completo, sem misturar dependencias.
+    for alias, sums in (
+        ('Piscina_Diagnostico_MercadoPago.zip', 'DIAGNOSTICO_MP_SHA256SUMS.txt'),
+        ('Piscina_Correcao_Cadastro_MercadoPago.zip', 'CADASTRO_MP_SHA256SUMS.txt'),
+    ):
+        target_alias = ROOT / 'downloads' / alias
+        shutil.copyfile(ROOT / 'downloads' / sandbox_name, target_alias)
+        (ROOT / 'downloads' / sums).write_text(
+            f'{hashlib.sha256(target_alias.read_bytes()).hexdigest()}  {alias}\n'
+        )
     print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, modelo config/example.php, migrações 003/004/005/006/007, guias e hashes conferidos; config/local.php excluído.')
-    print('Minipacotes: diagnóstico HTTP e correção do cadastro sandbox, com instruções e hashes.')
+    print('Sandbox Bricks: seis arquivos do módulo, instruções e hashes; nomes antigos entregam o mesmo conjunto completo.')
 
 
 if __name__ == '__main__':

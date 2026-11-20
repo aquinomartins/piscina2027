@@ -34,108 +34,103 @@ Fontes oficiais consultadas em 17/11/2026:
 
 ## Credenciais e prova do ambiente
 
-O caminho padrão aceita **Public Key e Access Token de Credenciais de teste**
-da aplicação **Checkout Transparente / API Pagamentos**, como na tela atual do
-Mercado Pago. Não exige ativar produção nem preencher Client Secret. Copie
-as duas chaves da **mesma aplicação**, somente no arquivo privado do servidor.
-Não existe formulário para enviar Access Token pelo navegador.
+Use **Public Key e Access Token de Credenciais de teste** da aplicação
+**Checkout Transparente / API Pagamentos**, sem ativar produção. O Access Token
+fica somente no arquivo privado do servidor, nunca no navegador ou nos logs.
 
-O prefixo `TEST-` é uma barreira inicial, **não é a prova do ambiente**:
+O fluxo segue o teste de cartões do Bricks: credenciais de teste da conta real,
+cartões oficiais e e-mail fictício diferente do vendedor. Não use endereços de
+contas `testuser.com` como pagador nesse fluxo. Não é necessário cadastrar
+clientes na API Clientes; a dependência adicionada anteriormente foi retirada
+após o retorno 150 (usuários incompatíveis) na hospedagem.
 
-1. O token precisa corresponder ao Número da aplicação e ao User ID configurados,
-   conforme o formato documentado de tokens da Payments API.
-2. O servidor autentica `GET /users/me` e exige o coletor esperado e país `MLB`.
-3. Busca um cadastro técnico fictício na API Clientes; se ainda não existir,
-   cria **somente esse cadastro, sem cartão e sem cobrança**, com e-mail
-   `test_payer_1@testuser.com`, dentro do formato sandbox indicado pela API.
-   O POST envia **somente `email`**. Se o cadastro já existir, apenas consulta
-   e confirma o estado; não modifica o cadastro nem seus cartões/metadados.
-4. Exige `live_mode === false` no cadastro e confirma os mesmos dados por
-   `GET /v1/customers/{id}` antes de permitir qualquer envio de pagamento.
+### Preparação não é autorização de pagamento
 
-Se a API Clientes não estiver disponível, faltar permissão ou não retornar
-explicitamente o booleano `false`, o módulo fica **bloqueado**. Não retira a
-verificação nem cria uma cobrança para descobrir o ambiente. O diagnóstico
-pode criar esse cliente técnico, mas não cria intenção/pagamento/saldo.
-O cliente técnico é reutilizado; resposta perdida é recuperada pela busca,
-sem repetir o POST. Não há dados pessoais nem cartão nesse cadastro.
+1. O servidor confere o formato TEST, aplicação/coletor e autentica a conta
+   com `GET /users/me`. Isso libera **somente preparar e tokenizar o cartão**.
+   A resposta ainda informa `environment_verified=false`; não inventa uma
+   confirmação de `live_mode` e mantém Pix bloqueado.
+2. O cartão é tokenizado pelo Card Payment Brick oficial. PAN/CVV não passam
+   pelos campos da aplicação. Após a confirmação com usuário/senha do Admin,
+   o servidor consulta `GET /v1/card_tokens/{id}` autenticado.
+3. Antes de qualquer POST de pagamento, exige ID correspondente, booleano
+   `live_mode=false`, estado `active`, validade futura e cartão oficial de
+   teste. Se a API devolver Public Key não nula, ela também deve corresponder;
+   o campo não é obrigatório nos modelos atuais do SDK. O acesso ao recurso
+   é autenticado com a credencial da aplicação/coletor já conferidos.
+4. Só depois desse atestado permite enviar o pagamento. Falta de prova,
+   token inválido, recusa da API ou falha de armazenamento bloqueiam o envio.
+5. Aprovação na criação não gera saldo: a consulta independente do pagamento
+   ainda precisa confirmar ambiente, coletor, valor, moeda, referência, método,
+   metadados e captura. O livro continua atômico e idempotente.
 
-Uma Public Key incompatível também impede o cartão: antes do POST de pagamento,
-o servidor confere o token gerado pelo Brick, `live_mode=false`, a Public Key
-esperada e o cartão oficial de teste. Cada pagamento ainda exige consulta
-independente e todas as conferências financeiras já descritas neste guia.
-O caminho da Payments API aceita somente chaves `TEST-`; tokens `APP_USR` de
-outras modalidades não são aceitos como alternativa.
+Uma prova privada de até **cinco minutos** libera Pix de teste. Ela vem da
+consulta do token acima ou de um pagamento de teste do mesmo coletor,
+consultado no servidor. O Pix não é liberado apenas por autenticar ou digitar
+senha. Se a prova expirar, faça outro teste com cartão ou consulte um pagamento
+de teste já existente. Essa exigência inicial é uma proteção deste módulo,
+**não uma regra geral do Pix no Mercado Pago**. Sem cartão disponível e sem
+prova anterior, o módulo permanece bloqueado.
 
-Referências:
-[API Clientes: cadastro e `live_mode`](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-api-payments/customers/create-customer/post),
-[consulta de credenciais e `/users/me`](https://www.mercadopago.com.br/developers/pt/docs/smartapps/resources/credentials),
-[contrato da API OAuth](https://www.mercadopago.com.br/developers/pt/reference/authentication/oauth/_oauth_token/post),
+O atestado em `storage/mercadopago-test-environment.json` usa permissão 0600,
+validade curta e fingerprint das chaves. Guarda somente origem da prova,
+coletor, fingerprint, expiração e `live_mode=false`: nenhum token de cartão,
+PAN, CPF, ID do recurso ou Access Token é persistido nele. Troca de chave,
+aplicação ou coletor invalida a prova. Nunca altere esse arquivo manualmente.
+
+Fontes oficiais conferidas em 20/11/2026:
+[Bricks: fluxo de teste](https://www.mercadopago.com.br/developers/pt/docs/checkout-bricks/integration-test/test-payment-flow),
+[consulta do token no SDK oficial](https://github.com/mercadopago/sdk-php/blob/master/src/MercadoPago/Client/CardToken/CardTokenClient.php),
+[metadados documentados do token](https://github.com/mercadopago/sdk-go/blob/master/pkg/cardtoken/response.go),
 [credenciais por ambiente](https://www.mercadopago.com.br/developers/pt/docs/checkout-bricks/additional-content/your-integrations/credentials).
+A documentação foi consultada; as consultas com as credenciais do usuário
+continuam dependendo de homologação na hospedagem.
 
-Documentação conferida também em 20/11/2026. As chamadas com as credenciais
-da sua aplicação precisam ser homologadas; consulte o relatório de validação.
+### Configuração privada
 
-No **arquivo privado `config/local.php`**, acrescente um único bloco ao array
-retornado. Preencha os segredos somente no servidor, fora de `public/` e do Git:
+No `config/local.php`, dentro do array retornado, preserve banco/SMTP e use:
 
 ```php
 'payments_test' => [
-    'enabled' => false, // mude para true somente após configurar os dados abaixo
-    'mode' => 'test',  // nenhum modo de produção é implementado nesta área
+    'enabled' => false, // true somente após configurar e instalar os arquivos
+    'mode' => 'test',
     'credential_source' => 'test_credentials',
     'public_key' => '', // Public Key TEST-... da tela Credenciais de teste
-    'access_token' => '', // Access Token TEST-... da mesma tela; segredo exclusivo do servidor
+    'access_token' => '', // segredo TEST-... da mesma aplicação, somente servidor
     'client_id' => '', // Número da aplicação, entre aspas
-    'collector_id' => '', // User ID mostrado em Informações gerais da aplicação, entre aspas
-    'max_amount' => '1000.00', // limite técnico por teste; decimal com ponto
-    'payer_email' => 'pagador.teste@example.com', // e-mail fictício diferente do vendedor
-    'webhook_secret' => '', // opcional; segredo das notificações de teste
+    'collector_id' => '', // User ID mostrado em Informações gerais, entre aspas
+    'max_amount' => '1000.00',
+    'payer_email' => 'pagador.teste@example.com', // fictício, diferente do vendedor, sem testuser.com
+    'webhook_secret' => '', // assinatura de teste opcional
 ],
 ```
 
-No Mercado Pago Developers, abra **Integrações → sua aplicação → Informações
-gerais**: o **Número da aplicação** corresponde a `client_id` e o **User ID**
-a `collector_id`. Ambos são strings de dígitos, entre aspas. Em **Credenciais
-de teste**, copie a Public Key e o Access Token completos para os campos de
-mesmo nome. Não coloque Access Token em `client_secret`, nem Public Key em
-`client_id`; não use o identificador de um usuário da Piscina.
+No Mercado Pago Developers, abra **Integrações → aplicação → Informações gerais**
+para o Número da aplicação e User ID; em **Credenciais de teste**, copie as
+chaves completas para os campos de mesmo nome. Não coloque Access Token em
+Client Secret nem Public Key em Client ID. Os identificadores devem ser
+strings de dígitos. Pode usar `getenv('MP_TEST_ACCESS_TOKEN') ?: ''` se a conta
+permitir variável privada. Esta modalidade aceita somente chaves TEST da
+Payments API, não credenciais APP_USR de outros produtos ou de produção.
 
-Pode usar `getenv('MP_TEST_ACCESS_TOKEN') ?: ''` no lugar do valor se a conta
-permitir variáveis de ambiente privadas. Nunca coloque credenciais em arquivos
-JavaScript, URLs, prints de tela, tickets públicos ou no ZIP.
+OAuth anterior continua compatível: `credential_source=oauth` usa Client
+ID/Secret, solicita `test_token=true` e exige `live_mode=false` na resposta.
+Seu fingerprint foi preservado; não há fallback de credenciais diretas
+incompletas para OAuth. Resolva operações pendentes antes de trocar o conjunto
+de chaves. O cache OAuth anterior permanece privado e separado.
 
-O Access Token fica somente em `config/local.php` ou na variável privada.
-O atestado é guardado por até cinco minutos em
-`storage/mercadopago-test-environment.json`, com permissão 0600 e sem copiar
-as chaves para o cache. Um lock privado evita cadastros simultâneos no mesmo
-servidor. Troca de chave, aplicação ou coletor invalida o atestado. Preserve
-o caráter privado do `storage/`. Somente a Public Key é entregue ao Brick.
-
-Instalações OAuth anteriores continuam compatíveis: `credential_source=oauth`
-usa Client ID/Client Secret, solicita `test_token=true` e exige `live_mode=false`
-e o coletor na resposta. O formato do fingerprint anterior foi preservado.
-Se `credential_source` estiver ausente, a presença de `public_key` ou
-`access_token` seleciona o caminho direto; sem esses campos, mantém OAuth.
-Não existe fallback para OAuth quando credenciais diretas estão incompletas.
-Resolver operações pendentes antes de trocar o conjunto de credenciais evita
-bloqueá-las pela proteção de fingerprint. O cache OAuth anterior continua
-privado em `storage/mercadopago-test-credentials.json`, com permissão 0600.
-
-Exige cURL com TLS/CA válidos e saída HTTPS para `api.mercadopago.com`. Se faltar
-cURL ou a comunicação/prova do ambiente falhar, o módulo não libera operações.
-Essa extensão adicional não se torna requisito para as telas normais do app.
-
-Após preencher, mude `enabled` para `true` e abra a área. O diagnóstico não cria
-pagamentos. Com Terminal/SSH, também pode usar:
+Exige cURL, TLS/CA válidos e saída HTTPS para `api.mercadopago.com` somente
+para este módulo. Após preencher, use `enabled=true` e abra a área. O
+[diagnóstico CLI](../bin/check-payment-test.php) não cria pagamento e informa
+se a área permite preparar o cartão e se o ambiente já foi comprovado:
 
 ```sh
 php bin/check-payment-test.php
 ```
 
-Se a verificação falhar, confira a mensagem administrativa, a aplicação e as
-permissões da API Clientes no provedor. A prova do ambiente, o componente real
-e as permissões ainda precisam ser homologados com suas credenciais de teste.
+`enabled=true` no diagnóstico significa que a preparação está disponível.
+`environment_verified=false` mantém envio de Pix e qualquer mutação sem prova
+bloqueados no servidor. Não altere flags para simular aprovação.
 
 ## Fluxo e destinos
 
@@ -300,51 +295,44 @@ manualmente. Para desativar, use `enabled=false`; registros históricos permanec
 consultáveis. Depois de usar, mantenha código compatível; não apague lançamentos
 nem restaure um banco antigo sobre transações posteriores.
 
-## Diagnóstico de recusa do provedor
+## Atualização após o código 150 no cadastro técnico
 
-Uma recusa na verificação inicial não comprova erro nas chaves: algumas APIs
-podem estar indisponíveis ou não autorizadas para a credencial/produto.
-O aviso agora identifica **Etapa**, **HTTP** original do provedor e **Código**
-seguro, por exemplo `autenticação da conta (/users/me)`, HTTP 403.
-Não devolve mensagem/corpo bruto, consultas com e-mail, IDs, tokens ou dados de
-cartão. Códigos são uma lista fechada; valores desconhecidos ficam como
-`não informado`. O tipo local de erro permanece igual para não transformar
-uma resposta incerta de pagamento em recusa definitiva.
+O retorno 150 na API Clientes vinha de uma dependência de verificação adicional
+do módulo, que não é necessária para o teste com Card Payment Brick. O fluxo
+atual usa o token oficial e **não cria nem consulta clientes técnicos**.
 
-Quem já instalou a versão de credenciais diretas pode usar
-[Piscina_Diagnostico_MercadoPago.zip](../downloads/Piscina_Diagnostico_MercadoPago.zip):
-guarde uma cópia e substitua **somente**
-`/home/oftalmol/aquino.bsb.br/app/MercadoPagoTestHttp.php`. Recarregue a área
-e compartilhe somente o aviso sanitizado. O pacote tem o arquivo, instruções
-e hashes, sem configuração privada. Não exige SQL, mudanças nas chaves ou
-ativação de produção. A recusa continua bloqueando o módulo; o diagnóstico
-serve para identificar a causa com a resposta real da conta do usuário.
+Baixe [Piscina_Sandbox_Bricks_MercadoPago.zip](../downloads/Piscina_Sandbox_Bricks_MercadoPago.zip)
+e substitua o conjunto de seis arquivos na raiz privada
+`/home/oftalmol/aquino.bsb.br/`:
 
-### Ajuste do cadastro técnico após HTTP 400
+- `app/MercadoPagoSandbox.php`
+- `app/MercadoPagoTestHttp.php`
+- `app/PaymentTests.php`
+- `public/admin-payments.php`
+- `public/assets/admin-payments.js`
+- `bin/check-payment-test.php`
 
-O aviso da hospedagem identificou HTTP 400 na criação do cadastro técnico;
-autenticação e busca haviam passado. `bad_request` sozinho não identifica o
-campo recusado. O POST foi reduzido a `{"email":"test_payer_1@testuser.com"}`,
-sem descrição opcional e sem o identificador longo gerado anteriormente.
-O endereço atende ao formato `test_payer_[0-9]{1,10}@testuser.com` indicado
-no erro 128 da [referência da API Clientes](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-api-payments/customers/create-customer/post).
-Essa alteração de compatibilidade ainda precisa ser validada na conta.
+Guarde backup dos arquivos. Envie o JavaScript primeiro, os PHP de app/bin em
+seguida e a página Admin por último; depois recarregue a área. A página usa
+versão própria da URL do módulo, sem mudar o Service Worker ou o app normal.
+Não há SQL novo, alteração de chaves, Webhooks, banco ou armazenamento.
+Preserve `config/local.php` e `storage/`. Não basta trocar apenas um PHP.
 
-Quem já instalou o módulo pode aplicar
-[Piscina_Correcao_Cadastro_MercadoPago.zip](../downloads/Piscina_Correcao_Cadastro_MercadoPago.zip),
-substituindo somente `app/MercadoPagoSandbox.php` e `app/MercadoPagoTestHttp.php`
-na raiz privada. Não há SQL novo nem mudança de chaves/configuração. O
-diagnóstico prioriza códigos específicos em `cause`, `causes` ou `errors`
-antes do genérico `bad_request` e traduz algumas frases conhecidas em textos
-fixos seguros; mensagens recebidas e dados sensíveis nunca são devolvidos.
-As exigências de coletor, `live_mode=false`, cartão de teste, consulta do
-pagamento e crédito atômico continuam obrigatórias.
+Os pacotes com os nomes anteriores de diagnóstico/cadastro, na branch atual,
+passaram a conter esse mesmo conjunto para evitar versões misturadas. Links
+antigos fixados em commits anteriores continuam sendo pacotes históricos;
+use o pacote acima desta revisão. Os overlays completos também foram refeitos.
+
+Se houver recusa, o aviso identifica etapa, status HTTP e códigos conhecidos,
+sem corpo bruto, tokens, IDs ou dados pessoais. Causas específicas têm
+prioridade sobre erro genérico. Mensagens reconhecidas viram textos fixos
+seguros; não se presume erro nas credenciais. Copie somente o aviso sanitizado.
 
 ## Arquivos e tabelas
 
 | Grupo | Responsabilidade |
 |---|---|
-| `app/MercadoPagoSandbox.php`, `MercadoPagoTestHttp.php`, `PaymentTestTransport.php` | Credenciais diretas de teste, prova na API Clientes, compatibilidade OAuth, transporte TLS e consulta da Payments API |
+| `app/MercadoPagoSandbox.php`, `MercadoPagoTestHttp.php`, `PaymentTestTransport.php` | Credenciais diretas, prova por token/pagamento, compatibilidade OAuth, transporte TLS e consulta da Payments API |
 | `app/PaymentTests.php`, `PaymentTestAuth.php`, `PaymentTestLedger.php` | Orquestração, identidade, validação do provedor e crédito atômico no livro atual |
 | `app/Domain.php`, `public/api.php` | Serviço financeiro interno e bloqueio de acesso pela API geral |
 | `public/admin-payments.php`, `admin-payments-api.php`, `payment-test-webhook.php` | Área Admin com CSP própria, endpoints privados e notificação verificada |
@@ -369,7 +357,7 @@ fornecidas credenciais neste workspace: **nenhuma transação nem autenticação
 OAuth real foi executada no Mercado Pago**. A documentação oficial foi consultada;
 a lógica e os cenários foram exercitados com transporte HTTP controlado e
 MySQL real. O componente real de cartão e a entrega de Webhooks precisam de
-homologação na sua aplicação, assim como a prova na API Clientes, débito e Pix
+homologação na sua aplicação, assim como a prova por token, débito e Pix
 no sandbox; OAuth também depende de homologação se optar pelo caminho antigo.
 
 Esta área não habilita pagamentos reais. Uma futura versão exige desenho

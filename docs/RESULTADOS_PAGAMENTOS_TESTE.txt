@@ -499,3 +499,76 @@ TRANSPORTE HTTP
 PASS Transporte HTTP: 20 verificações de rotas/host, zero conexões externas.
 PASS Diagnóstico HTTP: 35 verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.
 Nenhuma consulta autenticada ao Mercado Pago neste workspace. Validação na conta ainda pendente.
+
+
+FLUXO NATIVO BRICKS APOS CODIGO 150 — 20/11/2026
+API Clientes removida. PHP 8.3.36/MySQL 8.0.46 locais; respostas do provedor/SDK simuladas somente nos testes.
+Nenhuma credencial do usuario usada; nenhuma chamada autenticada ao Mercado Pago neste workspace.
+
+DOMINIO — EXECUCAO FOCADA
+PASS Pagamentos teste: flag desativada e política diferente impedem envio e emissão
+PASS Pagamentos teste: OAuth comprova live_mode falso e coletor antes de enviar
+PASS Pagamentos teste: conta autenticada prepara cartão sem declarar ambiente nem liberar Pix
+PASS Pagamentos teste: Public Key e Access Token preparam SDK sem Client Secret ou cadastro técnico
+PASS Pagamentos teste: chaves de produção, campos incompletos e pares de outra aplicação falham antes da API
+PASS Pagamentos teste: conta autenticada e país correspondem antes de preparar o componente
+PASS Pagamentos teste: token de cartão exige live_mode false ativo válido e cartão oficial antes do POST
+PASS Pagamentos teste: metadados documentados do SDK atestam token sem campo public_key opcional
+PASS Pagamentos teste: cache de prova não guarda token ou cartão e expiração bloqueia Pix
+PASS Pagamentos teste: rotação de chave invalida atestado e token da chave anterior é recusado
+PASS Pagamentos teste: consulta de pagamento de teste renova atestado sem novo envio ou crédito
+PASS Pagamentos teste: pagamento de produção não atesta ambiente nem gera crédito
+PASS Pagamentos teste: e-mails de contas testuser são impedidos antes do envio
+PASS Pagamentos teste: configuração OAuth anterior preserva fingerprint e prova antes de pagar
+PASS Pagamentos teste: nove combinações de meio e destino creditam uma vez no livro canônico
+PASS Pagamentos teste: resposta de criação aprovada e consulta pendente não creditam
+PASS Pagamentos teste: pendência, recusa e cancelamento não alteram saldo
+PASS Pagamentos teste: cartões reais ou de outro ambiente são impedidos antes do POST
+PASS Pagamentos teste: valor, moeda, ambiente, referência e destinatário são conferidos na consulta
+PASS Pagamentos teste: criação repetida e consulta repetida não duplicam saldo
+PASS Pagamentos teste: resposta perdida recupera pela referência sem reenviar pagamento
+PASS Pagamentos teste: ausência de pagamento não vira aprovação local
+PASS Pagamentos teste: cancelar tentativa ainda não registrada bloqueia envio atrasado
+PASS Pagamentos teste: abandonar chave de pagamento existente mostra o registro sem cancelamento fictício
+PASS Pagamentos teste: cancelamento consulta provedor e nunca cancela crédito já aprovado
+PASS Pagamentos teste: falha durante lançamento desfaz todos os créditos e permite conciliação
+PASS Pagamentos teste: conciliações concorrentes usam uma única emissão experimental
+PASS Pagamentos teste: notificação assinada consulta API; corpo e repetição não autorizam saldo
+PASS Pagamentos teste: assinatura falsa, expirada e parâmetros duplicados não consultam provedor
+PASS Pagamentos teste: usuário comum e outro Admin não acessam o pagamento
+PASS Pagamentos teste: revogação de privilégios antes da conciliação impede crédito
+PASS Pagamentos teste: dados sensíveis e destino arbitrário são recusados; registros não guardam token
+PASS Pagamentos teste: números JSON e centavos são exatos sem arredondamento binário
+PASS Pagamentos teste: mudança de credenciais bloqueia consulta e estorno não debita o jogo automaticamente
+PASS Pagamentos teste: crédito experimental financia e paga prêmio pelo fluxo existente
+
+35 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+CASO ADICIONAL: SOMENTE PIX
+PASS Pagamentos teste: somente Pix disponível não contorna a comprovação inicial do ambiente
+
+1 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+REEXECUCAO DO GRUPO OAUTH COM CREDITO POSITIVO
+PASS Pagamentos teste: configuração OAuth anterior preserva fingerprint e prova antes de pagar
+
+1 cenários, 0 falhas. MySQL 8.0.46, PHP 8.3.36
+
+TRANSPORTE HTTP
+PASS Transporte HTTP: 20 verificações de rotas/host, zero conexões externas.
+PASS Diagnóstico HTTP: 32 verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.
+
+NAVEGADOR
+PASS PHP/MySQL reais: páginas/APIs exclusivas do Admin, CSRF, e-mail/senha e bloqueio da função desligada; rota interna de crédito inacessível
+PASS Acesso Admin mobile preservado em 360/390/430 px; área desativada não carrega o SDK nem permite pagamento
+PASS UI local: conta autenticada prepara cartão sem declarar sandbox; Pix bloqueado inicialmente e liberado ao atualizar a preparação após prova
+PASS UI com API/SDK locais: nove combinações, resumo, autenticação, crédito identificado e comprovantes; 360/390/430/1440 px sem overflow e botões >=44 px
+PASS UI local: Pix pendente sem QR inventado, cancelamento e recusa exibem ausência de crédito
+PASS UI local: erro de senha preserva condições/confirmacão e limpa a senha antes de repetir
+PASS UI local: perda da resposta após registro recupera por chave e não cria outro pagamento
+PASS UI local: refresh durante resultado desconhecido preserva somente a chave e permite cancelar envio ainda não registrado
+PASS Sem erros JavaScript, sem cache de páginas/APIs privadas e sem SDK carregado no app normal
+
+Total desta revisao: 36 cenarios distintos de dominio; 52 verificacoes HTTP; nove grupos de navegador.
+Regressao completa de 183 cenarios pertence a revisao anterior e nao foi repetida nesta revisao.
+Fluxo real da conta, tokenizacao oficial, APRO/OTHE/CONT, debito, Pix e Webhooks dependem de homologacao.

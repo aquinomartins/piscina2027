@@ -28,9 +28,7 @@ namespace {
     require dirname(__DIR__).'/app/MercadoPagoTestHttp.php';
     $http=new Piscina\MercadoPagoTestHttp();$passed=0;
     $allowed=[
-        ['GET','/users/me'],['POST','/v1/customers'],
-        ['GET','/v1/customers/search?email=test_payer_1234567890%40testuser.com'],
-        ['GET','/v1/customers/23456-test-customer'],
+        ['GET','/users/me'],
         ['POST','/oauth/token'],['POST','/v1/payments'],
         ['GET','/v1/payments/12345'],['PUT','/v1/payments/12345'],
         ['GET','/v1/payments/search?external_reference=piscina-test-abcd&limit=2'],
@@ -47,6 +45,8 @@ namespace {
         ['GET','/v1/customers/search?email=real%40example.com'],
         ['GET','/users/me?access_token=NAO_PERMITIDO'],
         ['GET','/v1/customers/search?email=test_payer_1%40testuser.com&access_token=NAO_PERMITIDO'],
+        ['POST','/v1/customers'],['GET','/v1/customers/23456-test-customer'],
+        ['GET','/v1/customers/search?email=test_payer_1234567890%40testuser.com'],
     ];
     foreach($blocked as [$method,$path]){
         try{$http->request($method,$path);throw new RuntimeException('Rota insegura foi aceita.');}
@@ -60,9 +60,6 @@ namespace {
         ['GET','/users/me','autenticação da conta'],
         ['POST','/oauth/token','credencial OAuth'],
         ['GET','/v1/payment_methods','consulta dos meios'],
-        ['GET','/v1/customers/search?email=test_payer_123%40testuser.com','busca do cadastro técnico'],
-        ['POST','/v1/customers','criação do cadastro técnico'],
-        ['GET','/v1/customers/23456-test-customer','leitura do cadastro técnico'],
         ['GET','/v1/card_tokens/0123456789abcdef','verificação do cartão'],
         ['GET','/v1/payments/search?external_reference=piscina-test-abcd&limit=2','busca do pagamento'],
         ['POST','/v1/payments','envio do pagamento'],
@@ -101,7 +98,7 @@ namespace {
         ['message'=>'The customer already exists. '.$secret,'expected'=>'cliente de teste já existente'],
     ] as $case){
         $GLOBALS['payment_test_http_response']=['status'=>400,'raw'=>json_encode(['error'=>'bad_request','message'=>$case['message']])];
-        try{$http->request('POST','/v1/customers');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!str_contains($e->getMessage(),$case['expected'])||!str_contains($e->getMessage(),'Código: bad_request'))throw new RuntimeException('Mensagem não classificada com frase fixa.');$diagnostics++;}
+        try{$http->request('POST','/v1/payments');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!str_contains($e->getMessage(),$case['expected'])||!str_contains($e->getMessage(),'Código: bad_request'))throw new RuntimeException('Mensagem não classificada com frase fixa.');$diagnostics++;}
     }
     unset($GLOBALS['payment_test_http_response']);
     echo "PASS Diagnóstico HTTP: $diagnostics verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.\n";

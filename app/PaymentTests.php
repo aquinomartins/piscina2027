@@ -15,7 +15,14 @@ final class PaymentTests {
     }
     public function bootstrap(int $actor): array {
         $u=$this->d->admin($actor);$out=['enabled'=>false,'admin_id'=>$u['id'],'username'=>$u['email'],'reason'=>null,'experimental'=>true,'currency'=>'BRL','credit_asset'=>'MR'];
-        try{$this->enabled();$max=$this->max();$c=$this->provider->credentials();$methods=$this->provider->methods();$out+=['public_key'=>$c['public_key'],'methods'=>['credit_card'=>in_array('credit_card',$methods,true),'debit_card'=>in_array('debit_card',$methods,true),'pix'=>($methods['pix']??'')==='bank_transfer']];$out['max_amount']=$max;$out['enabled']=true;}
+        try{
+            $this->enabled();$max=$this->max();$c=$this->provider->credentials();$methods=$this->provider->methods();$verified=$this->provider->environmentVerified();
+            $available=['credit_card'=>in_array('credit_card',$methods,true),'debit_card'=>in_array('debit_card',$methods,true),'pix'=>($methods['pix']??'')==='bank_transfer'&&$verified];
+            if(!array_filter($available))throw new Problem('Nenhum meio de teste está liberado. A comprovação inicial exige cartão oficial de teste ou consulta de um pagamento de teste já existente.',409,'test_method_unavailable');
+            $out+=['public_key'=>$c['public_key'],'methods'=>$available,'environment_verified'=>$verified,'verification_notice'=>$verified?'Ambiente de teste confirmado pelo servidor. Use somente dados oficiais de teste.':'Conta autenticada. Faça primeiro um teste com cartão oficial: o servidor confirmará o ambiente antes de enviar o pagamento. O Pix será liberado após essa confirmação, por até cinco minutos.'];
+            // enabled libera a preparação/tokenização. create/call ainda exigem a prova antes de enviar ou cancelar pagamento.
+            $out['max_amount']=$max;$out['enabled']=true;
+        }
         catch(Problem $e){$out['reason']=$e->getMessage();}return $out;
     }
     private function max(): string {return Exact::units($this->d->config['payments_test']['max_amount']??'1000.00',2);}
@@ -37,9 +44,12 @@ final class PaymentTests {
             if(isset($card['issuer_id'])&&!preg_match('/^[0-9]{1,20}$/D',(string)$card['issuer_id']))throw new Problem('Emissor inválido.');
             $payer=$card['payer']??[];if(!is_array($payer)||array_diff(array_keys($payer),['email','identification']))throw new Problem('Dados de pagador não permitidos.');
             if(isset($payer['email'])&&(!is_string($payer['email'])||!filter_var($payer['email'],FILTER_VALIDATE_EMAIL)||strlen($payer['email'])>254))throw new Problem('E-mail de pagador de teste inválido.');
+            if(isset($payer['email'])&&preg_match('/@testuser\.com$/iD',$payer['email']))throw new Problem('No Checkout Bricks, use um e-mail fictício diferente do vendedor, sem contas de testuser.com.');
             $ident=$payer['identification']??null;
             if($ident!==null&&(!is_array($ident)||array_diff(array_keys($ident),['type','number'])||($ident['type']??'')!=='CPF'||($ident['number']??'')!=='12345678909'))throw new Problem('Use somente o CPF de teste publicado pelo Mercado Pago.');
         }
+        $payerEmail=$card['payer']['email']??$this->d->config['payments_test']['payer_email']??'pagador.teste@example.com';
+        if(!is_string($payerEmail)||!filter_var($payerEmail,FILTER_VALIDATE_EMAIL)||strlen($payerEmail)>254||preg_match('/@testuser\.com$/iD',$payerEmail))throw new Problem('Configure um e-mail fictício válido de pagador, diferente do vendedor e sem contas de testuser.com.');
         return ['amount'=>$amount,'destination'=>$destination,'method'=>$method,'payment_method_id'=>$paymentMethod,'card'=>$card];
     }
     public function create(int $actor,array $data,string $key): array {
@@ -52,6 +62,7 @@ final class PaymentTests {
         $c=$this->provider->credentials();$methods=$this->provider->methods();$type=$p['method']==='pix'?'bank_transfer':$p['method'];
         if(($methods[$p['payment_method_id']]??'')!==$type)throw new Problem('Este meio não está disponível para a aplicação de teste. Nenhum pagamento foi enviado.',409,'test_method_unavailable');
         if($p['method']!=='pix')$this->provider->card($p['card']['token'],$p['method']);
+        $this->provider->requireEnvironment();
         $id=bin2hex(random_bytes(16));$reference='piscina-test-'.$id;
         $inserted=$this->d->db->transaction(function()use($actor,$p,$hash,$key,$id,$reference,$c){
             // Apenas metadados locais. Nunca mantenha o gate econômico durante chamadas HTTP.
