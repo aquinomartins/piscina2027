@@ -5,6 +5,7 @@ import zipfile
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
+CONFIG_MODELS = ('config/example.php',)
 RUNTIME = sorted(
     [str(p.relative_to(ROOT)) for p in (ROOT / 'app').glob('*.php')]
     + [str(p.relative_to(ROOT)) for p in (ROOT / 'public/assets').iterdir() if p.is_file()]
@@ -38,7 +39,7 @@ DOCS = (
 
 
 def main():
-    files = RUNTIME + list(DOCS) + [
+    files = RUNTIME + list(CONFIG_MODELS) + list(DOCS) + [
         'database/migrations/003_admin_danger.sql',
         'database/migrations/004_galeria.sql',
         'database/migrations/005_molduras_simples.sql',
@@ -46,7 +47,9 @@ def main():
         'database/migrations/007_pagamentos_teste.sql',
     ]
     assert len(files) == len(set(files))
-    assert all(not p.startswith(('storage/', 'config/', 'tests/')) for p in files)
+    assert all(not p.startswith(('storage/', 'tests/')) for p in files)
+    assert all(not p.startswith('config/') or p in CONFIG_MODELS for p in files)
+    assert 'config/local.php' not in files
     payload = {p: (ROOT / p).read_bytes() for p in files}
     assert b'galeria.js' in payload['public/sw.js']
     assert b'admin-danger.js' in payload['public/sw.js']
@@ -95,7 +98,7 @@ def main():
     (ROOT / 'downloads/PAGAMENTOS_TESTE_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(payments.read_bytes()).hexdigest()}  {payments.name}\n'
     )
-    print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, migrações 003/004/005/006/007, guias e hashes conferidos.')
+    print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, modelo config/example.php, migrações 003/004/005/006/007, guias e hashes conferidos; config/local.php excluído.')
 
 
 if __name__ == '__main__':

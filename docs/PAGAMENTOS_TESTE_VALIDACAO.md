@@ -85,3 +85,17 @@ teste quando entregue; TLS/cURL e limites da Superdomínios; PWA e dispositivo
 físico/Safari. Não há aprovação de Pix local como substituta dessa homologação.
 
 Resultados brutos: [RESULTADOS_PAGAMENTOS_TESTE.txt](RESULTADOS_PAGAMENTOS_TESTE.txt).
+
+## Revisão do pacote em 20/11/2026
+
+O ZIP de atualização anterior excluía toda a pasta `config/`, embora o modelo
+atualizado estivesse no repositório e nos pacotes completos. O gerador passou
+a incluir explicitamente `config/example.php`, com `payments_test` desativado
+e credenciais vazias. Somente esse modelo público é permitido na pasta
+`config/` do overlay; `config/local.php` continua excluído.
+
+A verificação desta revisão abrange o conteúdo do modelo, a presença do bloco
+novo, a exclusão dos arquivos privados, CRC e hashes dos arquivos/pacotes e a
+comparação dos arquivos de execução com o ZIP anterior. A aplicação e a lógica
+de pagamentos não foram modificadas nesta correção de empacotamento. Não houve
+nova transação ou homologação com o Mercado Pago.

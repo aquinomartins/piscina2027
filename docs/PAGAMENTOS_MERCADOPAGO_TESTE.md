@@ -224,9 +224,20 @@ de Webhook sem homologar sua entrega no sandbox. Referência:
    `docs/` para a raiz privada `/home/oftalmol/aquino.bsb.br/`; o conteúdo de
    `public/` vai ao seu `public/`. Não coloque pastas privadas na raiz pública.
    Envie estáticos antes dos PHP integrados e `public/sw.js` por último.
+   A pasta `config/` contém **somente o modelo atualizado `example.php`**,
+   com `payments_test` desativado. Esse arquivo serve para consulta e pode
+   atualizar o modelo na pasta privada; **não o renomeie nem o copie por cima
+   de `config/local.php`** da instalação que já funciona. O arquivo privado
+   `local.php` e suas credenciais não são incluídos no ZIP.
 5. Preserve a configuração existente. Acrescente o bloco privado mostrado
    acima, começando com `enabled=false`. Configure cURL, aplicação OAuth,
    coletor e, opcionalmente, Webhook; só então habilite a área.
+
+   Para configurar pelo cPanel, abra **Gerenciador de arquivos →
+   aquino.bsb.br → config → local.php → Editar**. Dentro do `return [...]`,
+   acrescente somente o bloco `payments_test` do modelo, preservando banco,
+   SMTP e os demais valores. A ativação é `'enabled' => true` **dentro desse
+   bloco**, mantendo `'mode' => 'test'`; não é feita no `example.php`.
 6. Use **Atualizar app** no PWA. Confira a navegação normal e o painel Admin.
    Homologue os testes com dados fictícios antes de usá-los nos saldos do jogo.
    Nenhum novo cron, Node, Docker, Composer ou processo permanente é necessário.
