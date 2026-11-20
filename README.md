@@ -13,12 +13,13 @@ Aplicação PHP/MySQL para mercado de arte com **moeda exclusivamente simulada**
 - Administração, histórico, notificações, feed público autorizado, interface móvel, PWA e página offline sem operações automáticas.
 - Galeria/Molduras: criação só com nome, ofertas públicas ou exclusivas, compra/revenda e associação livre com NFTs, percentuais negociáveis e vinculação direta entre ativos do mesmo dono. Associação simples sem cotas, local ou agenda. Fluxo físico, cotas, eventos e ranking preservados como recursos avançados, em stand-by para novas operações. **Galeria desabilitada por padrão**; usa migrações 004/005 e ativação explícita do Admin.
 - Prêmios diretos do Admin para uma associação existente, financiados com contas atuais e divididos automaticamente pelos percentuais contratuais. Exigem aditivo aceito pelos proprietários e migração **006**; prévia, créditos atômicos, proteção contra duplicação e histórico imutável. Prêmios de votação preservados.
+- Área opcional **Pagamentos de teste** do Admin, com Checkout Bricks/Payments API do Mercado Pago, validação do ambiente, usuário/senha, confirmação no servidor e crédito experimental no livro atual. **Desativada por padrão**; exige migração 007, cURL e configuração privada. Nenhuma cobrança real é habilitada.
 
 ## Requisitos de execução
 
 PHP **8.3+ de 64 bits**, extensões PDO/PDO MySQL, BCMath, GD, mbstring, fileinfo e OpenSSL; MySQL/InnoDB com utf8mb4. Galeria verificada localmente em PHP 8.3.36 e MySQL 8.0.46. MariaDB e a conta específica da Superdomínios não foram verificados. HTTPS em produção e SMTP configurado.
 
-**Não há Node, Docker, Composer, Redis, WebSockets ou serviço externo obrigatório em produção.** PHPMailer 6.10.0 e a fonte Inter estão incluídos; não há dependências de CDN na aplicação. Node/Playwright são ferramentas opcionais de teste local.
+**Não há Node, Docker, Composer, Redis ou WebSockets obrigatório em produção.** PHPMailer 6.10.0 e a fonte Inter estão incluídos. As telas normais não dependem de CDN; somente a área opcional de pagamentos de teste carrega o SDK oficial do Mercado Pago e exige cURL/TLS/API externa. Node/Playwright são ferramentas opcionais de teste local.
 
 ## Começar em ambiente próprio
 
@@ -41,6 +42,12 @@ No repositório GitHub, a pasta `downloads/` contém o **ZIP de produção** e o
 Para baixar a versão atual de todo o código pelo GitHub, use **Code → Download ZIP**. Esse download inclui os testes; siga o guia para servir somente `public/`.
 
 Para a versão atual com premiação, baixe [Piscina_Premios_Associacoes.zip](downloads/Piscina_Premios_Associacoes.zip) e siga [o guia de instalação e uso](docs/PREMIOS_ASSOCIACOES.md). **Aplique a migração 006**, após 004 e 005. A integração do Portfólio/Pendências da PR #13 não exigia nova migração; a premiação desta versão exige. Os ZIPs atuais `Piscina_Portfolio_Pendencias.zip`, `Piscina_Galeria_Molduras.zip` e `Piscina_Molduras_Simples.zip` contêm o mesmo runtime compatível e a 006. Preserve a configuração privada e os dados; não reaplique pacotes antigos.
+
+Para pagamentos de teste, use [Piscina_Pagamentos_MercadoPago_Teste.zip](downloads/Piscina_Pagamentos_MercadoPago_Teste.zip), aplique a **007** após a 006 e siga [o guia de configuração e uso](docs/PAGAMENTOS_MERCADOPAGO_TESTE.md). Os overlays atuais também incluem essa opção e a 007; sem ativá-la, as funções anteriores continuam disponíveis. O módulo não aceita aprovação local como substituta do Mercado Pago. Não houve homologação de transações com credenciais do provedor neste workspace.
+
+O ZIP de atualização inclui **`config/example.php` atualizado**, com o bloco `payments_test` desativado e sem credenciais. **`config/local.php` fica fora do pacote**. Em uma instalação existente, copie somente o novo bloco para o arquivo privado, mantendo banco, SMTP e os demais valores; não substitua `local.php` pelo modelo.
+
+O módulo aceita **Public Key e Access Token de teste** da aplicação **Checkout Transparente / API Pagamentos** no `config/local.php`, usando `credential_source=test_credentials`. Autenticar a conta libera somente preparar o cartão. Antes de enviar pagamento, consulta o token oficial no servidor e exige `live_mode=false`, validade e cartão de teste. Não há criação de clientes técnicos. Pix fica bloqueado até uma prova recente por token ou consulta de pagamento de teste; prefixo sozinho não libera operações. O caminho OAuth anterior continua disponível. Não há migração adicional à 007. Comprovantes conservam a etapa, HTTP e código sanitizados de recusas de envio; consultas posteriores não apagam a causa de uma tentativa falha. O [pacote do fluxo nativo](downloads/Piscina_Sandbox_Bricks_MercadoPago.zip) atualiza somente o módulo/Admin; veja no guia como instalar o conjunto e quais etapas ainda dependem de homologação. Para quem já vê o diagnóstico no comprovante, o [ajuste dos detalhes do erro](downloads/Piscina_Detalhes_Erro_MercadoPago.zip) substitui somente o PHP do transporte, incluindo causas aninhadas, campos sem valores e referência técnica validada.
 
 ## Demonstração local opcional
 
@@ -68,7 +75,7 @@ Suíte de integridade: copie a configuração para um arquivo privado `tests/loc
 PISCINA_CONFIG=/CAMINHO/tests/local.php php tests/run.php
 ```
 
-A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A suíte atual contém 149 casos, incluindo 20 de premiação direta. [Resultados e reprodução dos prêmios](docs/PREMIOS_TESTES.md); [testes anteriores da Galeria](docs/GALERIA_TESTES.md).
+A suíte usa MySQL real, inclusive processos/conexões independentes para concorrência, deadlock e transação que atravessa o corte. O comando usa `proc_open`; isso é necessário apenas nos testes locais. A suíte atual contém 173 casos, incluindo 20 de premiação direta e 24 da área de pagamentos com transporte HTTP local controlado. [Validação e limites do Mercado Pago](docs/PAGAMENTOS_TESTE_VALIDACAO.md); [testes dos prêmios](docs/PREMIOS_TESTES.md).
 
 Jornadas no Chromium: em um banco de demonstração recém-criado, com as duas senhas no ambiente, execute `npm install` e `npm run test:browser`. Configure `TEST_URL`, `TEST_BASE_PATH`, `TEST_ARTIFACTS` e, se necessário, `CHROMIUM_PATH`. A suíte browser modifica somente a demonstração e configura seu primeiro corte de homologação. Não execute contra produção.
 
@@ -97,6 +104,8 @@ Para reconstruir os ZIPs e hashes de distribuição, execute `python3 tools/buil
 - [Integração das carteiras: testes e prévias](docs/MOLDURAS_CARTEIRA_TESTES.md)
 - [Prêmios de associações: uso, aditivo e instalação da 006](docs/PREMIOS_ASSOCIACOES.md)
 - [Prêmios: testes financeiros, concorrência e celular](docs/PREMIOS_TESTES.md)
+- [Mercado Pago de teste: configuração privada, uso e implantação](docs/PAGAMENTOS_MERCADOPAGO_TESTE.md)
+- [Pagamentos de teste: verificações realizadas e homologação pendente](docs/PAGAMENTOS_TESTE_VALIDACAO.md)
 - [Relatório de verificação](docs/VERIFICACAO.md)
 - [Estado e limites](docs/STATUS.md)
 

@@ -51,6 +51,7 @@ final class Domain {
                 'right.accept'=>$this->acceptRight($actor,$data), 'fee.pay'=>$this->payFee($actor,$data),
                 'nft.image'=>$this->associateImage($actor,$data),
                 'admin.nft.image_replace'=>$this->replaceNftImage($actor,$data),
+                'admin.payment_test.credit'=>(new PaymentTestLedger($this,$this->op,$this->effective))->credit($actor,$data),
                 'admin.danger.fine','admin.danger.ban','admin.danger.unban','admin.danger.delete'=>(new AdminDanger($this,$this->op,$this->effective))->apply($actor,$action,$data),
                 default=>preg_match('/^(admin\.)?galeria\./D',$action)?(new Galeria($this,$this->op,$this->effective))->apply($actor,$action,$data):throw new Problem('Ação desconhecida.',404)
             };

@@ -260,4 +260,5 @@ require __DIR__.'/galeria-domain.php';
 require __DIR__.'/molduras-simples-domain.php';
 require __DIR__.'/molduras-carteira-domain.php';
 require __DIR__.'/premios-domain.php';
+require __DIR__.'/payment-test-domain.php';
 echo "\n$tests cenários, $failed falhas. MySQL ".db()->row('SELECT VERSION() v')['v'].', PHP '.PHP_VERSION."\n";exit($failed?1:0);
