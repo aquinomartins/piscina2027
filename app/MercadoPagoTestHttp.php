@@ -13,10 +13,35 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
         if($body!==null)curl_setopt($curl,CURLOPT_POSTFIELDS,$body);
         try{$ok=curl_exec($curl);$status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);}finally{curl_close($curl);}
         if($ok===false||$status<200||$status>=300){
-            if($ok!==false&&in_array($status,[400,401,403,404,405,406,422],true))throw new Problem('O Mercado Pago não aceitou a solicitação de teste. Confira as credenciais e os dados de teste no painel do provedor.',422,'test_provider_rejected');
-            throw new Problem('Não foi possível confirmar a resposta do Mercado Pago. Consulte o resultado antes de tentar outra operação.',503,'test_provider_unavailable');
+            $context=self::context($method,$path,$status,$raw);
+            if($ok!==false&&in_array($status,[400,401,403,404,405,406,422],true))throw new Problem('O Mercado Pago recusou a solicitação de teste. '.$context.' Compartilhe somente esta mensagem para identificar a API recusada; não envie credenciais.',422,'test_provider_rejected');
+            throw new Problem('Não foi possível confirmar a resposta do Mercado Pago. '.$context.' Consulte o resultado antes de tentar outra operação.',503,'test_provider_unavailable');
         }
-        try{return self::decode($raw);}catch(\Throwable){throw new Problem('Resposta do Mercado Pago inválida. Nenhum crédito foi autorizado.',503,'test_provider_invalid');}
+        try{return self::decode($raw);}catch(\Throwable){throw new Problem('Resposta do Mercado Pago inválida. '.self::context($method,$path,$status,'').' Nenhum crédito foi autorizado.',503,'test_provider_invalid');}
+    }
+    // Somente etapas fixas, status HTTP e códigos conhecidos. Nunca devolva o corpo/message do provedor.
+    private static function context(string $method,string $path,int $status,string $raw): string {
+        $stage=match(true){
+            $path==='/users/me'=>'autenticação da conta (/users/me)',
+            $path==='/oauth/token'=>'credencial OAuth (/oauth/token)',
+            $path==='/v1/payment_methods'=>'consulta dos meios (/v1/payment_methods)',
+            str_starts_with($path,'/v1/customers/search?')=>'busca do cadastro técnico (/v1/customers/search)',
+            $path==='/v1/customers'=>'criação do cadastro técnico (/v1/customers)',
+            str_starts_with($path,'/v1/customers/')=>'leitura do cadastro técnico (/v1/customers/{id})',
+            str_starts_with($path,'/v1/card_tokens/')=>'verificação do cartão (/v1/card_tokens/{id})',
+            str_starts_with($path,'/v1/payments/search?')=>'busca do pagamento (/v1/payments/search)',
+            $path==='/v1/payments'=>'envio do pagamento (/v1/payments)',
+            $method==='PUT'=>'cancelamento do pagamento (/v1/payments/{id})',
+            default=>'consulta do pagamento (/v1/payments/{id})',
+        };
+        $code='não informado';
+        try{
+            $r=self::decode($raw);
+            $known=['invalid_token','invalid_access_token','unauthorized','unauthorized_client','forbidden','invalid_client','invalid_scope','invalid_grant','invalid_request','unsupported_grant_type','not_found','bad_request','validation_error','invalid_parameters','local_rate_limited','too_many_requests','PA_UNAUTHORIZED_RESULT_FROM_POLICIES','PA_UNAUTHORIZED_RESULT_FROM_AUTHORIZATION'];
+            $known=array_merge($known,array_map('strval',range(100,129)),['140','150','200','201','202','203','204','205','206','207','208','214']);
+            foreach([$r['code']??null,$r['error']??null,$r['cause'][0]['code']??null,$r['causes'][0]['code']??null] as $candidate)if(is_string($candidate)&&in_array($candidate,$known,true)){$code=$candidate;break;}
+        }catch(\Throwable){}
+        return 'Etapa: '.$stage.'. HTTP: '.($status>0?(string)$status:'sem resposta').'. Código: '.$code.'.';
     }
     // Preserva tokens numéricos JSON como strings decimais, sem passar por ponto flutuante.
     public static function decode(string $raw): array {

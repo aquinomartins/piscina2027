@@ -298,6 +298,26 @@ manualmente. Para desativar, use `enabled=false`; registros históricos permanec
 consultáveis. Depois de usar, mantenha código compatível; não apague lançamentos
 nem restaure um banco antigo sobre transações posteriores.
 
+## Diagnóstico de recusa do provedor
+
+Uma recusa na verificação inicial não comprova erro nas chaves: algumas APIs
+podem estar indisponíveis ou não autorizadas para a credencial/produto.
+O aviso agora identifica **Etapa**, **HTTP** original do provedor e **Código**
+seguro, por exemplo `autenticação da conta (/users/me)`, HTTP 403.
+Não devolve mensagem/corpo bruto, consultas com e-mail, IDs, tokens ou dados de
+cartão. Códigos são uma lista fechada; valores desconhecidos ficam como
+`não informado`. O tipo local de erro permanece igual para não transformar
+uma resposta incerta de pagamento em recusa definitiva.
+
+Quem já instalou a versão de credenciais diretas pode usar
+[Piscina_Diagnostico_MercadoPago.zip](../downloads/Piscina_Diagnostico_MercadoPago.zip):
+guarde uma cópia e substitua **somente**
+`/home/oftalmol/aquino.bsb.br/app/MercadoPagoTestHttp.php`. Recarregue a área
+e compartilhe somente o aviso sanitizado. O pacote tem o arquivo, instruções
+e hashes, sem configuração privada. Não exige SQL, mudanças nas chaves ou
+ativação de produção. A recusa continua bloqueando o módulo; o diagnóstico
+serve para identificar a causa com a resposta real da conta do usuário.
+
 ## Arquivos e tabelas
 
 | Grupo | Responsabilidade |

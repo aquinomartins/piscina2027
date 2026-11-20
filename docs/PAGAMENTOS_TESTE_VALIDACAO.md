@@ -140,3 +140,32 @@ de navegador concluídos, com 360/390/430/1440 px e ausência de erros JavaScrip
 O diagnóstico financeiro focado de 34 grupos também passou antes da regressão.
 PHP 8.3.36 e MySQL 8.0.46 locais. SQL e lógica financeira existentes não foram
 alterados nesta revisão; nenhum SQL foi executado na hospedagem.
+
+## Diagnóstico de recusa — 20/11/2026
+
+Um aviso real do Admin mostrou recusa genérica do provedor durante a
+verificação inicial, sem intenção/pagamento registrado. A imagem não indica
+qual endpoint foi recusado ou o status original; não atribuímos a causa às
+chaves nem removemos a prova de ambiente.
+
+O transporte agora devolve somente etapa fixa, status HTTP e código de uma
+lista fechada. Nunca inclui o corpo/message do provedor, cabeçalhos, query
+com e-mail, IDs de recursos ou dados de cartão. HTTP 400/401/403/404/405/406/422
+continuam `test_provider_rejected`; falhas de rede, 429, 5xx e respostas
+ambíguas continuam `test_provider_unavailable`. JSON inválido continua
+`test_provider_invalid`. Assim, a classificação usada no fluxo financeiro
+permanece preservada.
+
+Verificados localmente **20 casos de rota/host e 26 casos adicionais** do
+transporte real, com cURL interceptado somente no processo CLI de teste:
+etapas distintas, TLS/redirects, códigos seguros, corpos com segredos
+injetados, corpo inválido, status e resposta válida. Zero conexões externas.
+A validação desta revisão abrange o transporte HTTP. A regressão financeira
+completa de 183 cenários e as verificações de navegador foram executadas na
+revisão anterior das credenciais. A lógica financeira, configuração, esquema
+e prova de sandbox permaneceram iguais nesta revisão de diagnóstico.
+
+Apenas `app/MercadoPagoTestHttp.php` mudou no runtime. O pacote mínimo de
+diagnóstico e os pacotes atuais foram regenerados. A causa da recusa da conta
+aguarda o aviso sanitizado da hospedagem; não há homologação externa nesta
+revisão e não foram utilizadas credenciais do usuário.

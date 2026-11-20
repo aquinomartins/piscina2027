@@ -98,7 +98,41 @@ def main():
     (ROOT / 'downloads/PAGAMENTOS_TESTE_SHA256SUMS.txt').write_text(
         f'{hashlib.sha256(payments.read_bytes()).hexdigest()}  {payments.name}\n'
     )
+    diagnostic = ROOT / 'downloads/Piscina_Diagnostico_MercadoPago.zip'
+    diagnostic_payload = {
+        'app/MercadoPagoTestHttp.php': payload['app/MercadoPagoTestHttp.php'],
+        'LEIA_DIAGNOSTICO_MP.txt': (
+            'Diagnostico seguro do Mercado Pago - modulo da PR #16\n\n'
+            'Este pacote melhora a mensagem de erro. Nao libera pagamentos nem retira a prova do sandbox.\n'
+            '1. Guarde uma copia do app/MercadoPagoTestHttp.php instalado.\n'
+            '2. Substitua somente esse arquivo na raiz privada /home/oftalmol/aquino.bsb.br/.\n'
+            '   Caminho final: /home/oftalmol/aquino.bsb.br/app/MercadoPagoTestHttp.php\n'
+            '3. Recarregue Administracao > Pagamentos de teste na Piscina.\n'
+            '4. Copie somente o aviso com Etapa, HTTP e Codigo; nao envie senhas ou tokens.\n\n'
+            'Nao precisa alterar config/local.php, banco de dados ou storage para este diagnostico.\n'
+            'A mensagem nao exibe corpo bruto, chaves, e-mails, IDs privados ou dados de cartao.\n'
+        ).encode(),
+    }
+    diagnostic_payload['SHA256SUMS_DIAGNOSTICO.txt'] = ''.join(
+        f'{hashlib.sha256(data).hexdigest()}  {name}\n'
+        for name, data in sorted(diagnostic_payload.items())
+    ).encode()
+    with zipfile.ZipFile(diagnostic, 'w') as archive:
+        for name, data in sorted(diagnostic_payload.items()):
+            info = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED)
+    with zipfile.ZipFile(diagnostic) as archive:
+        assert archive.testzip() is None
+        assert set(archive.namelist()) == set(diagnostic_payload)
+        for name, data in diagnostic_payload.items():
+            assert archive.read(name) == data
+    (ROOT / 'downloads/DIAGNOSTICO_MP_SHA256SUMS.txt').write_text(
+        f'{hashlib.sha256(diagnostic.read_bytes()).hexdigest()}  {diagnostic.name}\n'
+    )
     print(f'{payments.name} e overlays compatíveis: {len(RUNTIME)} arquivos de execução, modelo config/example.php, migrações 003/004/005/006/007, guias e hashes conferidos; config/local.php excluído.')
+    print(f'{diagnostic.name}: somente app/MercadoPagoTestHttp.php, instruções e hashes.')
 
 
 if __name__ == '__main__':

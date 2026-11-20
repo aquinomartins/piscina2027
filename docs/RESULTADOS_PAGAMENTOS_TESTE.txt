@@ -446,3 +446,9 @@ PASS UI local: erro de senha preserva condições/confirmacão e limpa a senha a
 PASS UI local: perda da resposta após registro recupera por chave e não cria outro pagamento
 PASS UI local: refresh durante resultado desconhecido preserva somente a chave e permite cancelar envio ainda não registrado
 PASS Sem erros JavaScript, sem cache de páginas/APIs privadas e sem SDK carregado no app normal
+
+DIAGNÓSTICO DE RECUSA DO PROVEDOR — 20/11/2026
+PASS Transporte HTTP: 20 verificações de rotas/host, zero conexões externas.
+PASS Diagnóstico HTTP: 26 verificações de etapas, status, classificação e privacidade; rede simulada, zero conexões externas.
+Somente o transporte HTTP foi exercitado nesta revisão. O diagnóstico real aguarda a mensagem sanitizada da hospedagem.
+Nenhuma credencial do usuário, cobrança, alteração de saldo ou SQL na hospedagem.
