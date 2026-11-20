@@ -13,9 +13,20 @@ return [
     'smtp' => ['host' => '', 'port' => 587, 'username' => '', 'password' => '', 'encryption' => 'tls', 'from' => '', 'name' => 'Piscina de Liquidez'],
     'mail_transport' => 'smtp', // 'file' permitido somente em demo
     'galeria' => ['enabled' => false], // instale 004 e configure as condições antes de habilitar
-    // Opcional, somente Admin. OAuth solicita test_token=true e exige live_mode=false antes de pagar.
-    // Client Secret e Access Token nunca são enviados ao navegador ou incluídos nos ZIPs.
-    'payments_test' => ['enabled'=>false, 'mode'=>'test', 'client_id'=>'', 'client_secret'=>'', 'collector_id'=>'', 'max_amount'=>'1000.00', 'payer_email'=>'pagador.teste@example.com', 'webhook_secret'=>''],
+    // Opcional, somente Admin. Use Credenciais de teste da aplicação com API Pagamentos.
+    // Access Token fica somente neste arquivo privado; a API confirma coletor e live_mode=false antes de pagar.
+    'payments_test' => [
+        'enabled' => false,
+        'mode' => 'test',
+        'credential_source' => 'test_credentials',
+        'public_key' => '', // Public Key TEST-...; única chave entregue ao Brick
+        'access_token' => '', // Access Token TEST-...; nunca enviar ao navegador/Git/logs
+        'client_id' => '', // Número da aplicação, entre aspas
+        'collector_id' => '', // User ID da conta no Mercado Pago, entre aspas
+        'max_amount' => '1000.00',
+        'payer_email' => 'pagador.teste@example.com',
+        'webhook_secret' => '', // opcional
+    ],
     'max_users' => 500, 'max_nfts' => 5000, 'snapshot_periods_per_run' => 10, 'upload_bytes' => 5242880, 'upload_pixels' => 16000000,
     'max_batch' => 100, 'cron_seconds' => 50,
     'http_tasks' => ['enabled' => false, 'token_hash' => ''], // bearer aleatório, somente hash privado

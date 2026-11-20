@@ -34,23 +34,45 @@ Fontes oficiais consultadas em 17/11/2026:
 
 ## Credenciais e prova do ambiente
 
-O prefixo da chave não comprova o ambiente. O módulo **não recebe um Access
-Token colado no navegador ou no painel**. O servidor solicita uma credencial
-OAuth com `test_token=true`, usando Client ID/Client Secret privados da
-aplicação, e exige `live_mode === false`, Public Key válida, validade e
-`user_id` igual ao coletor configurado **antes de enviar um pagamento**.
+O caminho padrão aceita **Public Key e Access Token de Credenciais de teste**
+da aplicação **Checkout Transparente / API Pagamentos**, como na tela atual do
+Mercado Pago. Não exige ativar produção nem preencher Client Secret. Copie
+as duas chaves da **mesma aplicação**, somente no arquivo privado do servidor.
+Não existe formulário para enviar Access Token pelo navegador.
 
-O Client Secret é a credencial da aplicação usada somente nessa troca OAuth;
-não é enviado ao componente de cartão. Nenhum Access Token de produção é
-aceito como alternativa. Se a aplicação/permissão do Mercado Pago não fornecer
-um resultado OAuth de teste verificável, a área permanece desativada. Não
-contorne o bloqueio alterando o prefixo, retirando a verificação ou utilizando
-credenciais de produção de uma conta de teste.
+O prefixo `TEST-` é uma barreira inicial, **não é a prova do ambiente**:
+
+1. O token precisa corresponder ao Número da aplicação e ao User ID configurados,
+   conforme o formato documentado de tokens da Payments API.
+2. O servidor autentica `GET /users/me` e exige o coletor esperado e país `MLB`.
+3. Busca um cadastro técnico fictício na API Clientes; se ainda não existir,
+   cria **somente esse cadastro, sem cartão e sem cobrança**, com e-mail
+   `test_payer_N@testuser.com`. O número é estável para a aplicação/conta/chave.
+4. Exige `live_mode === false` no cadastro e confirma os mesmos dados por
+   `GET /v1/customers/{id}` antes de permitir qualquer envio de pagamento.
+
+Se a API Clientes não estiver disponível, faltar permissão ou não retornar
+explicitamente o booleano `false`, o módulo fica **bloqueado**. Não retira a
+verificação nem cria uma cobrança para descobrir o ambiente. O diagnóstico
+pode criar esse cliente técnico, mas não cria intenção/pagamento/saldo.
+O cliente técnico é reutilizado; resposta perdida é recuperada pela busca,
+sem repetir o POST. Não há dados pessoais nem cartão nesse cadastro.
+
+Uma Public Key incompatível também impede o cartão: antes do POST de pagamento,
+o servidor confere o token gerado pelo Brick, `live_mode=false`, a Public Key
+esperada e o cartão oficial de teste. Cada pagamento ainda exige consulta
+independente e todas as conferências financeiras já descritas neste guia.
+O caminho da Payments API aceita somente chaves `TEST-`; tokens `APP_USR` de
+outras modalidades não são aceitos como alternativa.
 
 Referências:
-[OAuth e `test_token`](https://www.mercadopago.com.br/developers/pt/docs/security/oauth/creation),
+[API Clientes: cadastro e `live_mode`](https://www.mercadopago.com.br/developers/pt/reference/online-payments/checkout-api-payments/customers/create-customer/post),
+[consulta de credenciais e `/users/me`](https://www.mercadopago.com.br/developers/pt/docs/smartapps/resources/credentials),
 [contrato da API OAuth](https://www.mercadopago.com.br/developers/pt/reference/authentication/oauth/_oauth_token/post),
 [credenciais por ambiente](https://www.mercadopago.com.br/developers/pt/docs/checkout-bricks/additional-content/your-integrations/credentials).
+
+Documentação conferida também em 20/11/2026. As chamadas com as credenciais
+da sua aplicação precisam ser homologadas; consulte o relatório de validação.
 
 No **arquivo privado `config/local.php`**, acrescente um único bloco ao array
 retornado. Preencha os segredos somente no servidor, fora de `public/` e do Git:
@@ -59,28 +81,44 @@ retornado. Preencha os segredos somente no servidor, fora de `public/` e do Git:
 'payments_test' => [
     'enabled' => false, // mude para true somente após configurar os dados abaixo
     'mode' => 'test',  // nenhum modo de produção é implementado nesta área
-    'client_id' => '',
-    'client_secret' => '',
-    'collector_id' => '', // user_id do coletor ligado à credencial de teste, não o ID do Admin da Piscina
+    'credential_source' => 'test_credentials',
+    'public_key' => '', // Public Key TEST-... da tela Credenciais de teste
+    'access_token' => '', // Access Token TEST-... da mesma tela; segredo exclusivo do servidor
+    'client_id' => '', // Número da aplicação, entre aspas
+    'collector_id' => '', // User ID mostrado em Informações gerais da aplicação, entre aspas
     'max_amount' => '1000.00', // limite técnico por teste; decimal com ponto
     'payer_email' => 'pagador.teste@example.com', // e-mail fictício diferente do vendedor
     'webhook_secret' => '', // opcional; segredo das notificações de teste
 ],
 ```
 
-Client ID e coletor devem ser strings de dígitos. Confira o coletor no painel
-**Suas integrações / dados da aplicação e da conta associada** ou com o suporte
-do Mercado Pago; ele precisa corresponder ao `user_id` da resposta OAuth de
-teste. Não copie o identificador de um usuário do aplicativo.
+No Mercado Pago Developers, abra **Integrações → sua aplicação → Informações
+gerais**: o **Número da aplicação** corresponde a `client_id` e o **User ID**
+a `collector_id`. Ambos são strings de dígitos, entre aspas. Em **Credenciais
+de teste**, copie a Public Key e o Access Token completos para os campos de
+mesmo nome. Não coloque Access Token em `client_secret`, nem Public Key em
+`client_id`; não use o identificador de um usuário da Piscina.
 
-Pode usar `getenv('MP_TEST_CLIENT_SECRET') ?: ''` no lugar do valor se a conta
+Pode usar `getenv('MP_TEST_ACCESS_TOKEN') ?: ''` no lugar do valor se a conta
 permitir variáveis de ambiente privadas. Nunca coloque credenciais em arquivos
 JavaScript, URLs, prints de tela, tickets públicos ou no ZIP.
 
-O Access Token obtido fica somente no servidor, em cache privado de até cinco
-minutos no `storage/mercadopago-test-credentials.json`, com permissão 0600 e
-vinculado à configuração atual. Preserve o caráter privado do `storage/`.
-Somente a Public Key é entregue ao componente no navegador do Admin.
+O Access Token fica somente em `config/local.php` ou na variável privada.
+O atestado é guardado por até cinco minutos em
+`storage/mercadopago-test-environment.json`, com permissão 0600 e sem copiar
+as chaves para o cache. Um lock privado evita cadastros simultâneos no mesmo
+servidor. Troca de chave, aplicação ou coletor invalida o atestado. Preserve
+o caráter privado do `storage/`. Somente a Public Key é entregue ao Brick.
+
+Instalações OAuth anteriores continuam compatíveis: `credential_source=oauth`
+usa Client ID/Client Secret, solicita `test_token=true` e exige `live_mode=false`
+e o coletor na resposta. O formato do fingerprint anterior foi preservado.
+Se `credential_source` estiver ausente, a presença de `public_key` ou
+`access_token` seleciona o caminho direto; sem esses campos, mantém OAuth.
+Não existe fallback para OAuth quando credenciais diretas estão incompletas.
+Resolver operações pendentes antes de trocar o conjunto de credenciais evita
+bloqueá-las pela proteção de fingerprint. O cache OAuth anterior continua
+privado em `storage/mercadopago-test-credentials.json`, com permissão 0600.
 
 Exige cURL com TLS/CA válidos e saída HTTPS para `api.mercadopago.com`. Se faltar
 cURL ou a comunicação/prova do ambiente falhar, o módulo não libera operações.
@@ -94,8 +132,8 @@ php bin/check-payment-test.php
 ```
 
 Se a verificação falhar, confira a mensagem administrativa, a aplicação e as
-permissões no provedor. A integração OAuth, o componente real e as permissões
-da sua conta ainda precisam ser homologados com suas credenciais de teste.
+permissões da API Clientes no provedor. A prova do ambiente, o componente real
+e as permissões ainda precisam ser homologados com suas credenciais de teste.
 
 ## Fluxo e destinos
 
@@ -230,17 +268,28 @@ de Webhook sem homologar sua entrega no sandbox. Referência:
    de `config/local.php`** da instalação que já funciona. O arquivo privado
    `local.php` e suas credenciais não são incluídos no ZIP.
 5. Preserve a configuração existente. Acrescente o bloco privado mostrado
-   acima, começando com `enabled=false`. Configure cURL, aplicação OAuth,
-   coletor e, opcionalmente, Webhook; só então habilite a área.
+   acima, começando com `enabled=false`. Configure cURL, as credenciais de
+   teste da aplicação, coletor e, opcionalmente, Webhook; só então habilite.
 
    Para configurar pelo cPanel, abra **Gerenciador de arquivos →
    aquino.bsb.br → config → local.php → Editar**. Dentro do `return [...]`,
    acrescente somente o bloco `payments_test` do modelo, preservando banco,
-   SMTP e os demais valores. A ativação é `'enabled' => true` **dentro desse
-   bloco**, mantendo `'mode' => 'test'`; não é feita no `example.php`.
+   SMTP e os demais valores. Configure `credential_source=test_credentials`,
+   Public Key, Access Token, Número da aplicação e User ID. A ativação é
+   `'enabled' => true` **dentro desse bloco**, mantendo `'mode' => 'test'`;
+   não é feita no `example.php`.
+
 6. Use **Atualizar app** no PWA. Confira a navegação normal e o painel Admin.
    Homologue os testes com dados fictícios antes de usá-los nos saldos do jogo.
    Nenhum novo cron, Node, Docker, Composer ou processo permanente é necessário.
+
+### Ordem no GitHub e na hospedagem
+
+A correção das credenciais foi acrescentada à PR #16 enquanto ela ainda estava
+aberta; não é preciso fazer merge da versão anterior antes. Faça o merge da
+PR atualizada e depois envie o pacote completo da atualização ao servidor,
+preservando `config/local.php` e `storage/`. Só então configure as chaves e
+ative. Se a 007 já estiver instalada, **esta correção não exige nova migração**.
 
 A 007 é reaplicável, só cria três tabelas novas e registra a versão ao final.
 Não muda carteiras, contratos, prêmios, cadastros ou saldos anteriores. DDL
@@ -253,7 +302,7 @@ nem restaure um banco antigo sobre transações posteriores.
 
 | Grupo | Responsabilidade |
 |---|---|
-| `app/MercadoPagoSandbox.php`, `MercadoPagoTestHttp.php`, `PaymentTestTransport.php` | OAuth de teste, transporte TLS, SDK tokens, métodos e consulta da Payments API |
+| `app/MercadoPagoSandbox.php`, `MercadoPagoTestHttp.php`, `PaymentTestTransport.php` | Credenciais diretas de teste, prova na API Clientes, compatibilidade OAuth, transporte TLS e consulta da Payments API |
 | `app/PaymentTests.php`, `PaymentTestAuth.php`, `PaymentTestLedger.php` | Orquestração, identidade, validação do provedor e crédito atômico no livro atual |
 | `app/Domain.php`, `public/api.php` | Serviço financeiro interno e bloqueio de acesso pela API geral |
 | `public/admin-payments.php`, `admin-payments-api.php`, `payment-test-webhook.php` | Área Admin com CSP própria, endpoints privados e notificação verificada |
@@ -278,7 +327,8 @@ fornecidas credenciais neste workspace: **nenhuma transação nem autenticação
 OAuth real foi executada no Mercado Pago**. A documentação oficial foi consultada;
 a lógica e os cenários foram exercitados com transporte HTTP controlado e
 MySQL real. O componente real de cartão e a entrega de Webhooks precisam de
-homologação na sua aplicação, assim como OAuth, débito e Pix no sandbox.
+homologação na sua aplicação, assim como a prova na API Clientes, débito e Pix
+no sandbox; OAuth também depende de homologação se optar pelo caminho antigo.
 
 Esta área não habilita pagamentos reais. Uma futura versão exige desenho
 financeiro separado da moeda simulada, autorização explícita para cobranças

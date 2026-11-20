@@ -47,6 +47,8 @@ Para pagamentos de teste, use [Piscina_Pagamentos_MercadoPago_Teste.zip](downloa
 
 O ZIP de atualização inclui **`config/example.php` atualizado**, com o bloco `payments_test` desativado e sem credenciais. **`config/local.php` fica fora do pacote**. Em uma instalação existente, copie somente o novo bloco para o arquivo privado, mantendo banco, SMTP e os demais valores; não substitua `local.php` pelo modelo.
 
+O módulo aceita **Public Key e Access Token de teste** da aplicação **Checkout Transparente / API Pagamentos** no `config/local.php`, usando `credential_source=test_credentials`. Antes de pagar, autentica a conta e exige `live_mode=false` em um cadastro técnico sem cartão/cobrança na API Clientes; prefixo sozinho não libera operações. O caminho OAuth anterior continua disponível. A correção das credenciais não exige migração adicional à 007. Consulte o guia acima para a ordem de merge/instalação e as limitações ainda não homologadas.
+
 ## Demonstração local opcional
 
 Use um banco separado e vazio; configure `environment=demo`, `secure_cookie=false` somente em HTTP local e `mail_transport=file`. Após as migrações:

@@ -20,7 +20,8 @@ Consulta à documentação não equivale à homologação de transações.
 ## Cenários financeiros
 
 `tests/payment-test-domain.php` integra a suíte existente. Cobertura:
-configuração desligada/inconsistente; prova OAuth estrita, sem confiar no
+configuração desligada/inconsistente; credenciais diretas, prova não financeira
+com `live_mode=false` e compatibilidade OAuth estrita, sem confiar apenas no
 prefixo; três meios × três destinos; números JSON exatos; ausência de crédito
 em pendência/recusa/cancelamento; criação aparentemente aprovada com consulta
 pendente; bloqueio de cartão/ambiente errado e divergências de valor/moeda,
@@ -45,6 +46,8 @@ descartável. Não execute na hospedagem ou com dados da turma.
 PISCINA_CONFIG=/CAMINHO_PRIVADO/teste.php php tests/run.php
 # Apenas os casos novos:
 PISCINA_CONFIG=/CAMINHO_PRIVADO/teste.php PISCINA_TEST_FILTER='Pagamentos teste:' php tests/run.php
+# Validação das rotas do transporte, interrompida antes da rede (exige cURL):
+php tests/payment-test-http.php
 ```
 
 ## Navegador e segurança HTTP
@@ -77,8 +80,9 @@ Não apaga a base de upgrade ao terminar.
 
 ## Homologação pendente
 
-Depois de instalar/configurar em ambiente próprio: validar OAuth com
-`live_mode=false` e coletor esperado; Card Payment Brick real com cartões
+Depois de instalar/configurar em ambiente próprio: validar Public Key/Access
+Token TEST, `/users/me` e cadastro técnico na API Clientes com `live_mode=false`
+e coletor esperado; validar OAuth se mantiver o caminho antigo; Card Payment Brick real com cartões
 oficiais APRO/OTHE/CONT; disponibilidade real de débito; comportamento do Pix,
 QR retornado e persistência de pendência; consulta por referência; Webhook de
 teste quando entregue; TLS/cURL e limites da Superdomínios; PWA e dispositivo
@@ -99,3 +103,40 @@ novo, a exclusão dos arquivos privados, CRC e hashes dos arquivos/pacotes e a
 comparação dos arquivos de execução com o ZIP anterior. A aplicação e a lógica
 de pagamentos não foram modificadas nesta correção de empacotamento. Não houve
 nova transação ou homologação com o Mercado Pago.
+
+## Credenciais diretas de teste — 20/11/2026
+
+A tela real da aplicação criada pelo usuário fornece Public Key e Access Token
+de teste. O módulo agora lê esse par de `config/local.php`, sem exigir Client
+Secret e sem ativar produção. Mantém a lógica financeira e os endpoints Admin.
+
+A prova anterior à cobrança autentica a conta, confirma o vínculo documentado
+do token com aplicação/usuário e exige booleano `live_mode=false` no cadastro
+técnico da API Clientes e em sua leitura independente. O cadastro tem somente
+um e-mail técnico fictício e descrição; não é pagamento, não tem cartão e não
+gera saldo. Cache privado por cinco minutos não guarda as chaves. Clientes
+existentes são reutilizados; erros ambíguos buscam o recurso sem novo POST.
+Falha/permissão insuficiente/resposta sem atestado bloqueiam a área.
+
+Dez cenários adicionais cobrem bootstrap sem OAuth, campos/chaves incompatíveis,
+coletor/país, `live_mode` inválido, leitura divergente, busca malformada, falta
+de permissão, resposta perdida, cache/expiração/rotação e preservação do
+fingerprint OAuth. Os 24 cenários financeiros existentes passaram a usar
+credenciais diretas por padrão; os testes OAuth continuam explícitos.
+
+`tests/payment-test-http.php` chama o transporte de produção com interceptação
+somente antes de `curl_init`, em processo CLI separado. Exercita 11 rotas
+válidas, host HTTPS fixo e nove rotas/métodos/consultas proibidos: 20 verificações,
+sem abrir conexão. Não há interceptação nem alternativa simulada no runtime.
+
+**Nenhuma credencial do usuário foi usada para testar.** As consultas ao
+Mercado Pago e a criação do cliente técnico ainda precisam ser homologadas
+com as permissões da aplicação criada. A documentação foi consultada; todos
+os resultados do provedor nesta revisão foram simulados localmente.
+
+Resultados desta revisão: **183 cenários completos sem falhas**, incluindo os
+34 grupos de pagamentos; 20 verificações de rotas/host sem conexão; oito grupos
+de navegador concluídos, com 360/390/430/1440 px e ausência de erros JavaScript.
+O diagnóstico financeiro focado de 34 grupos também passou antes da regressão.
+PHP 8.3.36 e MySQL 8.0.46 locais. SQL e lógica financeira existentes não foram
+alterados nesta revisão; nenhum SQL foi executado na hospedagem.

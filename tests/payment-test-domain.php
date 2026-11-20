@@ -6,11 +6,49 @@ test('Pagamentos teste: flag desativada e política diferente impedem envio e em
     service()->config['payments_test']['enabled']=true;db()->run('UPDATE decision_versions SET policy=?',[json_encode(['assets'=>'external','payment'=>'BRL'])]);fail(fn()=>$p->create(1,ptdata(),testKey()));
 });
 test('Pagamentos teste: OAuth comprova live_mode falso e coletor antes de enviar',function(){
-    foreach([['live_mode'=>true],['live_mode'=>'false'],['live_mode'=>null],['user_id'=>'999'],['public_key'=>'']] as $bad){[$p,$h]=ptfixture();$h->credential=array_replace($h->credential,$bad);fail(fn()=>$p->create(1,ptdata(),testKey()));assertSame(0,$h->creates);assertSame(0,ptcreditCount());}
+    foreach([['live_mode'=>true],['live_mode'=>'false'],['live_mode'=>null],['user_id'=>'999'],['public_key'=>'']] as $bad){[$p,$h]=ptfixture(['credential_source'=>'oauth']);$h->credential=array_replace($h->credential,$bad);fail(fn()=>$p->create(1,ptdata(),testKey()));assertSame(0,$h->creates);assertSame(0,ptcreditCount());}
 });
 test('Pagamentos teste: prefixo de teste não substitui atestado do provedor',function(){
-    [$p,$h]=ptfixture();$h->credential['live_mode']=true;$b=$p->bootstrap(1);check(!$b['enabled'],'Área deve estar desativada.');check(!isset($b['public_key']),'Não inicializar SDK sem ambiente verificado.');assertSame(0,$h->creates);
+    [$p,$h]=ptfixture();$h->customerOverride['live_mode']=true;$b=$p->bootstrap(1);check(!$b['enabled'],'Área deve estar desativada.');check(!isset($b['public_key']),'Não inicializar SDK sem ambiente verificado.');assertSame(0,$h->creates);
     [$p,$h]=ptfixture(['max_amount'=>'inválido']);check(!$p->bootstrap(1)['enabled'],'Limite inconsistente mantém área desativada.');assertSame(0,$h->oauth);
+});
+test('Pagamentos teste: Public Key e Access Token habilitam sem Client Secret ou OAuth',function(){
+    [$p,$h]=ptfixture(['client_secret'=>'']);$b=$p->bootstrap(1);check($b['enabled'],'Credenciais diretas verificadas.');assertSame($h->credential['public_key'],$b['public_key']);check(!isset($b['access_token']),'Segredo não vai ao navegador.');assertSame(0,$h->oauth);assertSame(1,$h->userQueries);assertSame(1,$h->customerCreates);assertSame(1,$h->customerQueries);assertSame(0,$h->creates);assertSame(0,ptcreditCount());
+    $cfg=service()->config;unset($cfg['payments_test']['credential_source'],$cfg['payments_test']['client_secret']);$automatic=new Piscina\PaymentTests(service(),new Piscina\MercadoPagoSandbox($cfg,$h));check($automatic->bootstrap(1)['enabled'],'O par de chaves seleciona o caminho direto sem campos OAuth.');assertSame(0,$h->oauth);
+});
+test('Pagamentos teste: chaves de produção, campos incompletos e pares de outra aplicação falham antes da API',function(){
+    foreach([['public_key'=>'APP_USR-123456789012345678901234567890'],['access_token'=>'APP_USR-123456789012345678901234567890'],['access_token'=>'TEST-12345-111712-00000000000000000000000000000000-23456'],['public_key'=>''],['access_token'=>''],['access_token'=>[]],['client_id'=>'99999'],['collector_id'=>'99999'],['client_id'=>12345],['collector_id'=>23456],['mode'=>'production'],['credential_source'=>'invalid'],['credential_source'=>[]]] as $bad){
+        [$p,$h]=ptfixture($bad);$b=$p->bootstrap(1);check(!$b['enabled'],'Configuração inconsistente deve bloquear.');check(!isset($b['public_key']),'SDK não liberado.');assertSame(0,$h->userQueries);assertSame(0,$h->customerCreates);assertSame(0,$h->creates);assertSame(0,$h->oauth);
+    }
+});
+test('Pagamentos teste: conta autenticada e país devem corresponder antes da prova de ambiente',function(){
+    foreach([['id'=>'99999'],['id'=>null],['id'=>true],['id'=>[]],['site_id'=>'MLA'],['site_id'=>null]] as $bad){[$p,$h]=ptfixture();$h->userOverride=$bad;check(!$p->bootstrap(1)['enabled'],'Conta divergente bloqueada.');assertSame(0,$h->customerCreates);assertSame(0,$h->creates);}
+    [$p,$h]=ptfixture();$h->rejectIdentity=true;check(!$p->bootstrap(1)['enabled'],'Falha de identidade bloqueada.');assertSame(0,$h->customerCreates);assertSame(0,$h->creates);
+});
+test('Pagamentos teste: prova não financeira exige booleano live_mode=false antes de criar pagamento',function(){
+    foreach([true,'false',null,0] as $mode){[$p,$h]=ptfixture();$h->customerOverride['live_mode']=$mode;fail(fn()=>$p->create(1,ptdata('pix'),testKey()));assertSame(0,$h->creates);assertSame(0,ptcreditCount());}
+});
+test('Pagamentos teste: leitura independente do cadastro técnico precisa confirmar os mesmos dados',function(){
+    foreach([['live_mode'=>true],['live_mode'=>null],['email'=>'other@example.com'],['id'=>'other-customer']] as $bad){[$p,$h]=ptfixture();$h->customerGetOverride=$bad;fail(fn()=>$p->create(1,ptdata(),testKey()));assertSame(1,$h->customerQueries);assertSame(0,$h->creates);assertSame(0,ptcreditCount());}
+});
+test('Pagamentos teste: busca inválida ou permissão insuficiente nunca libera pagamento',function(){
+    foreach([['results'=>null],[],['results'=>['not_a_customer']],['results'=>[['id'=>'a'],['id'=>'b']]]] as $bad){[$p,$h]=ptfixture();$h->searchOverride=$bad;check(!$p->bootstrap(1)['enabled'],'Prova ausente bloqueia.');assertSame(0,$h->creates);}
+    [$p,$h]=ptfixture();$h->rejectCustomer=true;check(!$p->bootstrap(1)['enabled'],'Clientes não permitido bloqueia.');assertSame(1,$h->customerCreates);assertSame(0,$h->creates);assertSame(0,ptcreditCount());
+});
+test('Pagamentos teste: resposta perdida do cadastro técnico recupera sem repetir criação',function(){
+    [$p,$h]=ptfixture();$h->lostCustomer=true;check($p->bootstrap(1)['enabled'],'Cadastro reencontrado e consultado.');assertSame(1,$h->customerCreates);assertSame(2,$h->customerSearches);assertSame(1,$h->customerQueries);assertSame(0,$h->creates);assertSame(0,ptcreditCount());
+});
+test('Pagamentos teste: cache privado contém somente atestado e expiração obriga nova consulta',function(){
+    [$p,$h]=ptfixture();check($p->bootstrap(1)['enabled'],'Primeira verificação.');$cfg=service()->config;$file=$cfg['storage'].'/mercadopago-test-environment.json';$raw=file_get_contents($file);$cache=json_decode($raw,true,32,JSON_THROW_ON_ERROR);check(!str_contains($raw,$h->credential['access_token']),'Access Token não é duplicado no cache.');check(!str_contains($raw,$h->credential['public_key']),'Chave pública não precisa ir ao cache.');clearstatcache(true,$file);assertSame(0600,fileperms($file)&0777);
+    $other=new Piscina\PaymentTests(service(),new Piscina\MercadoPagoSandbox($cfg,$h));check($other->bootstrap(1)['enabled'],'Atestado recente reutilizado.');assertSame(1,$h->userQueries);assertSame(1,$h->customerCreates);
+    $cache['expires_at']=time()-1;file_put_contents($file,json_encode($cache));$h->customerGetOverride=['live_mode'=>true];$other=new Piscina\PaymentTests(service(),new Piscina\MercadoPagoSandbox($cfg,$h));check(!$other->bootstrap(1)['enabled'],'Expiração obriga revalidar ambiente.');assertSame(2,$h->userQueries);assertSame(1,$h->customerCreates);assertSame(0,$h->creates);
+});
+test('Pagamentos teste: troca de Public Key invalida cache e não usa comprovação antiga',function(){
+    [$p,$h]=ptfixture();check($p->bootstrap(1)['enabled'],'Atestado anterior.');service()->config['payments_test']['public_key']='TEST-87654321-4321-1234-9876-abcdef123456';$h->customerOverride=['live_mode'=>true];$other=new Piscina\PaymentTests(service(),new Piscina\MercadoPagoSandbox(service()->config,$h));check(!$other->bootstrap(1)['enabled'],'Outra chave exige nova prova.');assertSame(2,$h->userQueries);assertSame(2,$h->customerCreates);assertSame(0,$h->creates);
+});
+test('Pagamentos teste: configuração OAuth anterior preserva fingerprint e continua exigindo atestado',function(){
+    [$p,$h,$provider]=ptfixture(['credential_source'=>'oauth']);$cfg=service()->config;$c=$cfg['payments_test'];$expected=hash('sha256',Piscina\Domain::canonical(['client_id'=>$c['client_id'],'client_secret'=>$c['client_secret'],'collector_id'=>$c['collector_id'],'mode'=>$c['mode']]));assertSame($expected,$provider->fingerprint());
+    unset($cfg['payments_test']['credential_source'],$cfg['payments_test']['public_key'],$cfg['payments_test']['access_token']);$legacy=new Piscina\MercadoPagoSandbox($cfg,$h);assertSame($expected,$legacy->fingerprint());$credential=$legacy->credentials();check($credential['live_mode']===false,'Prova OAuth mantida.');assertSame(1,$h->oauth);assertSame(0,$h->userQueries);
 });
 test('Pagamentos teste: nove combinações de meio e destino creditam uma vez no livro canônico',function(){
     [$p,$h]=ptfixture();op(1,'admin.approve',['user_id'=>'1']);$before=balance(1,'MR');
@@ -76,7 +114,7 @@ test('Pagamentos teste: números JSON e centavos são exatos sem arredondamento 
     $d=Piscina\MercadoPagoTestHttp::decode('{"id":12345678901234567890,"transaction_amount":0.10,"live_mode":false,"label":"abc123, 0.11"}');assertSame('12345678901234567890',$d['id']);assertSame('0.10',$d['transaction_amount']);check($d['live_mode']===false,'Booleano permanece booleano.');assertSame('abc123, 0.11',$d['label']);[$p,$h]=ptfixture();$p->create(1,ptdata(amount:'0.10'),testKey());assertSame('0.10',$h->posts[0]['transaction_amount']);assertSame('10',balance(1,'MR'));
 });
 test('Pagamentos teste: mudança de credenciais bloqueia consulta e estorno não debita o jogo automaticamente',function(){
-    [$p,$h]=ptfixture();$r=$p->create(1,ptdata(),testKey());$h->payments[$r['provider_id']]['status']='refunded';$s=$p->refresh(1,$r['id']);assertSame('REVIEW',$s['state']);assertSame('10001',balance(1,'MR'));assertSame(1,ptcreditCount());[$other]=ptfixture(['client_secret'=>str_repeat('z',32)]);fail(fn()=>$other->refresh(1,$r['id']));
+    [$p,$h]=ptfixture();$r=$p->create(1,ptdata(),testKey());$h->payments[$r['provider_id']]['status']='refunded';$s=$p->refresh(1,$r['id']);assertSame('REVIEW',$s['state']);assertSame('10001',balance(1,'MR'));assertSame(1,ptcreditCount());[$other]=ptfixture();fail(fn()=>$other->refresh(1,$r['id']));
 });
 test('Pagamentos teste: crédito experimental financia e paga prêmio pelo fluxo existente',function(){
     [$p]=ptfixture();$p->create(1,ptdata(amount:'100.00'),testKey());assertSame('10000',balance(1,'MR'));$f=pf();$prize=pcreate('100.00','MR',true,'wallet');paward(ppreview($prize['prize_id'],$f['consent']));assertSame('0',balance(1,'MR'));assertSame(1,ptcreditCount());assertSame('PAID',db()->row('SELECT funds_state FROM galeria_events WHERE id=?',[$prize['prize_id']])['funds_state']);

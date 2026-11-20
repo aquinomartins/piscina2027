@@ -5,10 +5,25 @@ namespace Piscina;
 final class MercadoPagoSandbox {
     private ?array $credential=null;
     public function __construct(private array $config,private PaymentTestTransport $http=new MercadoPagoTestHttp()){}
-    public function fingerprint(): string { $c=$this->config['payments_test']??[];return hash('sha256',Domain::canonical(['client_id'=>$c['client_id']??'','client_secret'=>$c['client_secret']??'','collector_id'=>$c['collector_id']??'','mode'=>$c['mode']??''])); }
+    private function source(): string {
+        $c=$this->config['payments_test']??[];
+        if(!is_array($c))throw new Problem('Confira o bloco payments_test em config/local.php.',409,'test_not_configured');
+        $source=$c['credential_source']??(array_key_exists('public_key',$c)||array_key_exists('access_token',$c)?'test_credentials':'oauth');
+        if(!is_string($source)||!in_array($source,['test_credentials','oauth'],true))throw new Problem('Use credential_source=test_credentials no bloco payments_test.',409,'test_not_configured');
+        return $source;
+    }
+    public function fingerprint(): string {
+        $c=$this->config['payments_test']??[];
+        // Preserve a identidade das operações OAuth já registradas antes desta atualização.
+        $fields=['client_id'=>$c['client_id']??'','client_secret'=>$c['client_secret']??'','collector_id'=>$c['collector_id']??'','mode'=>$c['mode']??''];
+        if($this->source()!=='oauth')$fields=['credential_source'=>$this->source(),'client_id'=>$c['client_id']??'','collector_id'=>$c['collector_id']??'','mode'=>$c['mode']??'','public_key'=>$c['public_key']??'','access_token'=>$c['access_token']??''];
+        return hash('sha256',Domain::canonical($fields));
+    }
     public function credentials(): array {
         if($this->credential)return $this->credential;$c=$this->config['payments_test']??[];
-        if(!is_array($c)||($c['enabled']??false)!==true||($c['mode']??'')!=='test'||!is_string($c['client_id']??null)||!preg_match('/^[0-9]{3,30}$/D',$c['client_id'])||!is_string($c['client_secret']??null)||strlen($c['client_secret'])<16||!is_string($c['collector_id']??null)||!preg_match('/^[0-9]{1,30}$/D',$c['collector_id']))throw new Problem('Pagamentos de teste desativados ou configuração privada incompleta. Configure OAuth de teste e o coletor esperado.',409,'test_not_configured');
+        if(!is_array($c)||($c['enabled']??false)!==true||($c['mode']??'')!=='test'||!is_string($c['client_id']??null)||!preg_match('/^[0-9]{3,30}$/D',$c['client_id'])||!is_string($c['collector_id']??null)||!preg_match('/^[0-9]{1,30}$/D',$c['collector_id']))throw new Problem('Pagamentos de teste desativados ou configuração privada incompleta. Confira payments_test em config/local.php.',409,'test_not_configured');
+        if($this->source()==='test_credentials')return $this->credential=$this->testCredentials($c);
+        if($this->source()!=='oauth'||!is_string($c['client_secret']??null)||strlen($c['client_secret'])<16)throw new Problem('Configure Public Key e Access Token de teste em payments_test no config/local.php; use credential_source=test_credentials.',409,'test_not_configured');
         $file=rtrim($this->config['storage'],'/').'/mercadopago-test-credentials.json';$fingerprint=$this->fingerprint();
         if(is_file($file)){$cache=json_decode((string)@file_get_contents($file),true);if(is_array($cache)&&($cache['fingerprint']??'')===$fingerprint&&($cache['expires_at']??0)>time())return $this->credential=$this->validateCredential($cache['credential']??[]);}
         // O ambiente é atestado pela resposta OAuth recebida via TLS, antes de qualquer pagamento.
@@ -17,6 +32,56 @@ final class MercadoPagoSandbox {
         $tmp=tempnam(dirname($file),'.mp-test-');if($tmp===false)throw new Problem('Armazenamento privado indisponível para o teste.',503);
         try{if(!chmod($tmp,0600)||file_put_contents($tmp,json_encode(['fingerprint'=>$fingerprint,'expires_at'=>time()+$seconds,'credential'=>$safe],JSON_THROW_ON_ERROR))===false||!rename($tmp,$file))throw new Problem('Não foi possível proteger a credencial de teste.',503);}finally{if(is_file($tmp))unlink($tmp);}
         return $this->credential=$safe;
+    }
+    private function testCredentials(array $c): array {
+        // Esta integração usa as credenciais TEST da Payments API. APP_USR não é uma alternativa.
+        if(!is_string($c['public_key']??null)||!preg_match('/^TEST-[A-Za-z0-9_-]{16,145}$/D',$c['public_key'])||!is_string($c['access_token']??null)||!preg_match('/^TEST-[A-Za-z0-9_-]{16,295}$/D',$c['access_token']))throw new Problem('Copie a Public Key e o Access Token de Credenciais de teste da aplicação com API Pagamentos. Chaves de produção não são aceitas.',409,'test_not_configured');
+        // O formato documentado também vincula o token à aplicação e à conta esperadas.
+        if(!str_starts_with($c['access_token'],'TEST-'.$c['client_id'].'-')||!str_ends_with($c['access_token'],'-'.$c['collector_id']))throw new Problem('O Access Token de teste não corresponde ao número da aplicação ou ao User ID configurado. Confira os três dados da mesma aplicação.',409,'test_credentials_mismatch');
+        $file=rtrim($this->config['storage'],'/').'/mercadopago-test-environment.json';$fingerprint=$this->fingerprint();
+        $lock=@fopen($file.'.lock','c+b');
+        if($lock===false)throw new Problem('Armazenamento privado indisponível para verificar as credenciais de teste.',503,'test_storage_unavailable');
+        try{
+            if(!chmod($file.'.lock',0600)||!flock($lock,LOCK_EX))throw new Problem('Não foi possível proteger a verificação de teste.',503,'test_storage_unavailable');
+            $cache=is_file($file)?json_decode((string)@file_get_contents($file),true):null;
+            if(is_array($cache)&&($cache['fingerprint']??'')===$fingerprint&&is_int($cache['expires_at']??null)&&$cache['expires_at']>time()&&$cache['expires_at']<=time()+300&&($cache['user_id']??'')===$c['collector_id']&&($cache['live_mode']??null)===false&&is_string($cache['customer_id']??null)&&preg_match('/^[A-Za-z0-9_-]{1,100}$/D',$cache['customer_id']))return $this->directCredential($c);
+            $headers=['Authorization: Bearer '.$c['access_token']];
+            $user=$this->http->request('GET','/users/me',null,$headers);
+            if(!is_string($user['id']??null)||$user['id']!==$c['collector_id']||($user['site_id']??'')!=='MLB')throw new Problem('O Mercado Pago não confirmou a conta recebedora brasileira configurada. Nenhum pagamento será enviado.',409,'test_credentials_mismatch');
+            // Prova não financeira: o recurso de Clientes informa live_mode. Nunca teste o ambiente criando uma cobrança.
+            $email='test_payer_'.(string)hexdec(substr(hash('sha256',$c['client_id'].':'.$c['collector_id'].':'.$c['public_key']),0,8)).'@testuser.com';
+            $path='/v1/customers/search?'.http_build_query(['email'=>$email]);
+            $rows=$this->customers($path,$headers);
+            if(!$rows){
+                try{$customer=$this->http->request('POST','/v1/customers',json_encode(['email'=>$email,'description'=>'Piscina: verificacao tecnica de teste, sem cartao e sem pagamento'],JSON_THROW_ON_ERROR),$headers);$rows=[$customer];}
+                catch(Problem $e){
+                    // Uma resposta perdida ou outro servidor pode ter criado o mesmo cadastro. Não repita o POST.
+                    $rows=$this->customers($path,$headers);if(!$rows)throw $e;
+                }
+            }
+            if(count($rows)!==1||!is_array($rows[0]))throw $this->unverified();
+            $this->customerProof($rows[0],$email);
+            $customer=$this->http->request('GET','/v1/customers/'.$rows[0]['id'],null,$headers);
+            $this->customerProof($customer,$email);
+            if($customer['id']!==$rows[0]['id'])throw $this->unverified();
+            // Cache apenas do atestado, sem Public Key, Access Token ou dados pessoais.
+            $this->writeProof($file,['fingerprint'=>$fingerprint,'expires_at'=>time()+300,'user_id'=>$c['collector_id'],'customer_id'=>$customer['id'],'live_mode'=>false]);
+            return $this->directCredential($c);
+        }finally{flock($lock,LOCK_UN);fclose($lock);}
+    }
+    private function customers(string $path,array $headers): array {
+        $r=$this->http->request('GET',$path,null,$headers);
+        if(!is_array($r['results']??null)||!array_is_list($r['results']))throw $this->unverified();
+        return $r['results'];
+    }
+    private function customerProof(array $r,string $email): void {
+        if(($r['live_mode']??null)!==false||($r['email']??'')!==$email||!is_string($r['id']??null)||!preg_match('/^[A-Za-z0-9_-]{1,100}$/D',$r['id']))throw $this->unverified();
+    }
+    private function unverified(): Problem {return new Problem('O Mercado Pago não confirmou live_mode=false no cadastro técnico de teste (API Clientes). A área permanece bloqueada; nenhum pagamento foi enviado.',409,'test_environment_unverified');}
+    private function directCredential(array $c): array {return ['access_token'=>$c['access_token'],'public_key'=>$c['public_key'],'user_id'=>$c['collector_id'],'token_type'=>'bearer','live_mode'=>false];}
+    private function writeProof(string $file,array $proof): void {
+        $tmp=tempnam(dirname($file),'.mp-test-proof-');if($tmp===false)throw new Problem('Armazenamento privado indisponível para o teste.',503,'test_storage_unavailable');
+        try{if(!chmod($tmp,0600)||file_put_contents($tmp,json_encode($proof,JSON_THROW_ON_ERROR))===false||!rename($tmp,$file))throw new Problem('Não foi possível proteger o atestado de teste.',503,'test_storage_unavailable');}finally{if(is_file($tmp))unlink($tmp);}
     }
     private function validateCredential(array $r): array {
         $c=$this->config['payments_test'];

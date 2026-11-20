@@ -3,11 +3,19 @@ declare(strict_types=1);
 if(PHP_SAPI!=='cli'||config()['environment']!=='demo'||!preg_match('/dbname=piscina_test(?:;|$)/',config()['database']['dsn']))throw new RuntimeException('Somente testes descartáveis.');
 // HTTP falso exclusivamente no processo de teste; não há seletor de mock no runtime distribuído.
 final class FakeMercadoPagoTestHttp implements Piscina\PaymentTestTransport {
-    public array $credential=['access_token'=>'TEST_FAKE_ACCESS_abcdefghijklmnopqrstuvwxyz','public_key'=>'TEST_FAKE_PUBLIC_abcdefghijklmnopqrstuvwxyz','token_type'=>'bearer','user_id'=>'23456','live_mode'=>false,'expires_in'=>'3600'];
+    public array $credential=['access_token'=>'TEST-12345-111712-0123456789abcdef0123456789abcdef-23456','public_key'=>'TEST-12345678-1234-4321-9876-123456789abc','token_type'=>'bearer','user_id'=>'23456','live_mode'=>false,'expires_in'=>'3600'];
+    public array $userOverride=[],$customerOverride=[],$customerGetOverride=[],$customers=[];public ?array $searchOverride=null;public bool $lostCustomer=false,$rejectCustomer=false,$rejectIdentity=false;public int $userQueries=0,$customerCreates=0,$customerQueries=0,$customerSearches=0;
     public array $payments=[],$posts=[],$overrides=[],$cardOverride=[];public string $nextStatus='approved';public ?string $getStatus=null;public bool $lostAfterPost=false,$lostBeforePost=false,$rejectPost=false,$rejectGet=false;public int $creates=0,$queries=0,$oauth=0;public static int $next=10000;public ?Closure $hook=null;
     public function request(string $method,string $path,?string $body=null,array $headers=[]): array {
         if($path==='/oauth/token'){$this->oauth++;$d=json_decode($body,true);check(($d['test_token']??null)===true,'OAuth sempre solicita teste.');assertSame('client_credentials',$d['grant_type']);return $this->credential;}
-        check(in_array('Authorization: Bearer '.$this->credential['access_token'],$headers,true),'Token somente no header do servidor.');
+        if(!in_array('Authorization: Bearer '.$this->credential['access_token'],$headers,true))throw new Piscina\Problem('Credencial recusada pelo transporte local.',422,'test_provider_rejected');
+        if($path==='/users/me'){$this->userQueries++;if($this->rejectIdentity)throw new Piscina\Problem('Identidade indisponível no transporte local.',503,'test_provider_unavailable');return $this->userOverride+['id'=>'23456','site_id'=>'MLB'];}
+        if(str_starts_with($path,'/v1/customers/search?')){$this->customerSearches++;parse_str(substr($path,strpos($path,'?')+1),$q);return $this->searchOverride??['results'=>array_values(array_filter($this->customers,fn($c)=>$c['email']===$q['email']))];}
+        if($path==='/v1/customers'&&$method==='POST'){
+            $this->customerCreates++;if($this->rejectCustomer)throw new Piscina\Problem('Clientes indisponível no transporte local.',422,'test_provider_rejected');$d=json_decode($body,true);check(array_keys($d)===['email','description'],'Prova não envia cartão ou dados pessoais.');check((bool)preg_match('/^test_payer_[0-9]{1,10}@testuser\.com$/D',$d['email']),'E-mail técnico fictício.');
+            $c=$this->customerOverride+['id'=>'23456-test-customer','email'=>$d['email'],'live_mode'=>false];$this->customers[$c['id']]=$c;if($this->lostCustomer){$this->lostCustomer=false;throw new Piscina\Problem('Resposta do cadastro técnico perdida.',503,'test_provider_unavailable');}return $c;
+        }
+        if(preg_match('~^/v1/customers/([A-Za-z0-9_-]+)$~D',$path,$m)){$this->customerQueries++;return $this->customerGetOverride+($this->customers[$m[1]]??[]);}
         if($path==='/v1/payment_methods'){if($this->hook){$f=$this->hook;$this->hook=null;$f();}return [['id'=>'master','payment_type_id'=>'credit_card','status'=>'active'],['id'=>'elo_debito','payment_type_id'=>'debit_card','status'=>'active'],['id'=>'pix','payment_type_id'=>'bank_transfer','status'=>'active']];}
         if(str_starts_with($path,'/v1/card_tokens/')){$id=substr($path,16);$debit=str_contains($id,'debit');return $this->cardOverride+['id'=>$id,'live_mode'=>false,'public_key'=>$this->credential['public_key'],'first_six_digits'=>$debit?'506776':'548083','last_four_digits'=>$debit?'8311':'3311'];}
         if($method==='POST'&&$path==='/v1/payments'){
@@ -26,8 +34,9 @@ final class FakeMercadoPagoTestHttp implements Piscina\PaymentTestTransport {
     }
 }
 function ptfixture(array $overrides=[]): array {
-    $cfg=service()->config;$cfg['payments_test']=$overrides+['enabled'=>true,'mode'=>'test','client_id'=>'12345','client_secret'=>bin2hex(random_bytes(16)),'collector_id'=>'23456','max_amount'=>'1000.00','webhook_secret'=>str_repeat('s',32),'payer_email'=>'pagador.teste@example.com'];service()->config=$cfg;
-    $http=new FakeMercadoPagoTestHttp();$provider=new Piscina\MercadoPagoSandbox($cfg,$http);$payments=new Piscina\PaymentTests(service(),$provider);return [$payments,$http,$provider];
+    $http=new FakeMercadoPagoTestHttp();$http->credential['access_token']='TEST-12345-111712-'.bin2hex(random_bytes(16)).'-23456';
+    $cfg=service()->config;$cfg['payments_test']=$overrides+['enabled'=>true,'mode'=>'test','credential_source'=>'test_credentials','public_key'=>$http->credential['public_key'],'access_token'=>$http->credential['access_token'],'client_id'=>'12345','client_secret'=>bin2hex(random_bytes(16)),'collector_id'=>'23456','max_amount'=>'1000.00','webhook_secret'=>str_repeat('s',32),'payer_email'=>'pagador.teste@example.com'];service()->config=$cfg;
+    $provider=new Piscina\MercadoPagoSandbox($cfg,$http);$payments=new Piscina\PaymentTests(service(),$provider);return [$payments,$http,$provider];
 }
 function ptdata(string $method='credit_card',string $dest='wallet',string $amount='100.01'): array {
     return ['amount'=>$amount,'destination'=>$dest,'method'=>$method,'card'=>$method==='pix'?[]:['token'=>'fake_'.$method.'_'.str_repeat('a',24),'payment_method_id'=>$method==='credit_card'?'master':'elo_debito','installments'=>'1','payer'=>['email'=>'pagador.teste@example.com','identification'=>['type'=>'CPF','number'=>'12345678909']]],'confirm'=>true];
