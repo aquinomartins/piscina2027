@@ -83,6 +83,7 @@ final class PaymentTests {
             // Criação não autoriza crédito. Sempre faça uma consulta independente autenticada.
             $this->bind($id,$providerId);return $this->synchronize($id,$this->provider->payment($providerId));
         }catch(Problem $e){
+            $this->recordProviderFailure($id,$e);
             if($e->error==='test_provider_rejected')$this->d->db->run("UPDATE payment_test_intents SET state=IF(provider_id IS NULL AND state='SUBMITTING','FAILED',IF(state='SUBMITTING','UNKNOWN',state)),error_code=? WHERE id=?",[$e->error,$id]);
             else $this->markUnknown($id,$e->error);
             return $this->read($actor,$id);
@@ -92,7 +93,11 @@ final class PaymentTests {
         $this->d->db->transaction(function()use($id,$providerId){$r=$this->row($id,true);if($r['provider_id']!==null&&$r['provider_id']!==$providerId)throw new Problem('Identificador divergente do provedor.',409,'test_response_mismatch');$this->d->db->run('UPDATE payment_test_intents SET provider_id=? WHERE id=?',[$providerId,$id]);});
     }
     private function markUnknown(string $id,string $code): void {
-        $this->d->db->run("UPDATE payment_test_intents SET state=IF(credit_transaction_id IS NULL AND state IN ('SUBMITTING','UNKNOWN'),'UNKNOWN',state),error_code=? WHERE id=?",[preg_match('/^[a-z_]{1,40}$/D',$code)?$code:'test_provider_unavailable',$id]);
+        $this->d->db->run("UPDATE payment_test_intents SET state=IF(credit_transaction_id IS NULL AND state IN ('SUBMITTING','UNKNOWN'),'UNKNOWN',state),error_code=IF(state='FAILED' AND error_code IS NOT NULL,error_code,?) WHERE id=?",[preg_match('/^[a-z_]{1,40}$/D',$code)?$code:'test_provider_unavailable',$id]);
+    }
+    private function recordProviderFailure(string $id,Problem $e): void {
+        // Não persista getMessage() de exceções genéricas: pode conter dados do ambiente.
+        if($e instanceof MercadoPagoTestFailure)$this->event($id,'PROVIDER_FAILURE',['code'=>$e->error,'diagnostic'=>$e->diagnostic,'experimental'=>true]);
     }
     private function row(string $id,bool $lock=false): array {if(!preg_match('/^[a-f0-9]{32}$/D',$id))throw new Problem('Identificador inválido.');return $this->d->db->row('SELECT * FROM payment_test_intents WHERE id=?'.($lock?' FOR UPDATE':''),[$id])??throw new Problem('Pagamento de teste não encontrado.',404);}
     public function refresh(int $actor,string $id): array {
@@ -102,7 +107,7 @@ final class PaymentTests {
             if($r['provider_id']!==null)$p=$this->provider->payment($r['provider_id']);
             else{$search=$this->provider->search($r['external_reference']);$rows=$search['results']??[];if(!is_array($rows)||count($rows)!==1){if(count($rows)>1)throw new Problem('Mais de um resultado para a referência. O crédito foi bloqueado.',409,'test_response_mismatch');$this->markUnknown($id,'test_not_found_yet');return $this->read($actor,$id);}$p=$this->provider->payment((string)$rows[0]['id']);}
             return $this->synchronize($id,$p);
-        }catch(Problem $e){if($e->status<500)throw $e;$this->markUnknown($id,$e->error);return $this->read($actor,$id);}
+        }catch(Problem $e){$this->recordProviderFailure($id,$e);if($e->status<500)throw $e;$this->markUnknown($id,$e->error);return $this->read($actor,$id);}
     }
     public function validate(array $r,array $p): array {
         $amount=null;try{$amount=Exact::units($p['transaction_amount']??null,2);}catch(Problem){}
@@ -147,6 +152,8 @@ final class PaymentTests {
         $this->d->admin($actor);if(!self::installed($this->d->db))throw new Problem('Instale a migração 007.',409);$r=$this->row($id);if((string)$actor!==$r['actor_id'])throw new Problem('Pagamento de teste de outro administrador.',403);
         unset($r['payload_hash'],$r['credential_fingerprint'],$r['verified_hash'],$r['verified_snapshot']);$r['experimental']=true;
         $r['events']=$this->d->db->all('SELECT kind,data,created_at FROM payment_test_events WHERE intent_id=? ORDER BY id DESC LIMIT 24',[$id]);
+        $r['provider_failure']=null;
+        if($r['error_code']!==null){$failure=$this->d->db->row("SELECT data FROM payment_test_events WHERE intent_id=? AND kind='PROVIDER_FAILURE' ORDER BY id DESC LIMIT 1",[$id]);if($failure){$detail=json_decode($failure['data'],true,16,JSON_THROW_ON_ERROR);if(is_string($detail['diagnostic']??null))$r['provider_failure']=$detail['diagnostic'];}}
         $r['pix_notice']=$r['method']==='pix'?'Pix no sandbox de Checkout Bricks pode permanecer pendente. Não escaneie códigos em aplicativo bancário. Não há aprovação local nem crédito enquanto o Mercado Pago não confirmar.':null;return $r;
     }
     public function list(int $actor,array $q=[]): array {

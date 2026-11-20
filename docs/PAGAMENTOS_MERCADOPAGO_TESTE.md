@@ -328,6 +328,43 @@ sem corpo bruto, tokens, IDs ou dados pessoais. Causas específicas têm
 prioridade sobre erro genérico. Mensagens reconhecidas viram textos fixos
 seguros; não se presume erro nas credenciais. Copie somente o aviso sanitizado.
 
+### Quando aparece “Nenhum crédito lançado”
+
+Essa frase informa a ausência de lançamento, não a aprovação do cartão. No
+comprovante, confira o estado local e **Estado consultado no Mercado Pago**:
+
+- **Falha na solicitação / `FAILED`**: o envio foi recusado antes de obter uma
+  aprovação. É diferente de um pagamento criado e recusado (`REJECTED`).
+- **Pendente / resultado desconhecido**: consulte a tentativa original;
+  nenhuma aprovação é presumida por ausência de resposta.
+- **Provedor aprovou; crédito ainda não concluído**: consulte novamente para
+  repetir a conciliação da mesma operação. O livro impede crédito duplicado.
+- **Aprovado no ambiente de teste**, com lançamento interno: o crédito está
+  na conta escolhida e pode circular no jogo. O valor em BRL de teste é
+  lançado no mesmo número de centavos de MR.
+
+A tela passou a exibir **Por que o crédito não foi lançado**, com etapa,
+status HTTP e código sanitizados da recusa. O diagnóstico é preservado em
+`payment_test_events` como `PROVIDER_FAILURE`, sem corpo bruto, cabeçalhos,
+e-mail, senha, token de cartão, PAN, CPF ou Access Token. Consultas posteriores
+sem resultado mantêm a causa de uma tentativa já marcada como `FAILED`.
+Uma consulta válida que conclui o crédito retira o aviso de falha atual;
+o histórico preserva o ocorrido.
+
+Tentativas antigas que guardaram somente `test_provider_rejected` ou
+`test_not_found_yet` não contêm a causa original detalhada. O código novo
+não pode reconstruir essa resposta. Atualize o conjunto de seis arquivos do
+pacote acima e prepare **um novo teste**, com cartão oficial, titular APRO,
+e-mail fictício diferente do vendedor e valor pequeno, por exemplo R$ 1,00.
+Se houver recusa, compartilhe somente o texto do diagnóstico mostrado no
+comprovante. Não altere o saldo ou o estado diretamente no banco para aprovar.
+
+Esta correção melhora a identificação da falha de envio; ela não presume a
+causa da recusa na conta instalada e não substitui a aprovação no provedor.
+Reutiliza a migração 007, sem SQL novo e sem trocar configuração ou chaves.
+Os resultados atuais e a distinção entre testes locais e homologação estão
+no [relatório de validação](PAGAMENTOS_TESTE_VALIDACAO.md).
+
 ## Arquivos e tabelas
 
 | Grupo | Responsabilidade |

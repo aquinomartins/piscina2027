@@ -13,11 +13,14 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
         if($body!==null)curl_setopt($curl,CURLOPT_POSTFIELDS,$body);
         try{$ok=curl_exec($curl);$status=(int)curl_getinfo($curl,CURLINFO_RESPONSE_CODE);}finally{curl_close($curl);}
         if($ok===false||$status<200||$status>=300){
-            $context=self::context($method,$path,$status,$raw);
-            if($ok!==false&&in_array($status,[400,401,403,404,405,406,422],true))throw new Problem('O Mercado Pago recusou a solicitação de teste. '.$context.' Compartilhe somente esta mensagem para identificar a API recusada; não envie credenciais.',422,'test_provider_rejected');
-            throw new Problem('Não foi possível confirmar a resposta do Mercado Pago. '.$context.' Consulte o resultado antes de tentar outra operação.',503,'test_provider_unavailable');
+            throw self::failure($method,$path,$status,$raw,$ok!==false);
         }
-        try{return self::decode($raw);}catch(\Throwable){throw new Problem('Resposta do Mercado Pago inválida. '.self::context($method,$path,$status,'').' Nenhum crédito foi autorizado.',503,'test_provider_invalid');}
+        try{return self::decode($raw);}catch(\Throwable){$context=self::context($method,$path,$status,'');throw new MercadoPagoTestFailure('Resposta do Mercado Pago inválida. '.$context.' Nenhum crédito foi autorizado.',503,'test_provider_invalid',$context);}
+    }
+    public static function failure(string $method,string $path,int $status,string $raw,bool $received=true): Problem {
+        $context=self::context($method,$path,$status,$raw);
+        if($received&&in_array($status,[400,401,403,404,405,406,422],true))return new MercadoPagoTestFailure('O Mercado Pago recusou a solicitação de teste. '.$context.' Compartilhe somente esta mensagem para identificar a API recusada; não envie credenciais.',422,'test_provider_rejected',$context);
+        return new MercadoPagoTestFailure('Não foi possível confirmar a resposta do Mercado Pago. '.$context.' Consulte o resultado antes de tentar outra operação.',503,'test_provider_unavailable',$context);
     }
     // Somente etapas fixas, status HTTP e códigos conhecidos. Nunca devolva o corpo/message do provedor.
     private static function context(string $method,string $path,int $status,string $raw): string {
@@ -39,6 +42,8 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
             $r=self::decode($raw);
             $known=['invalid_token','invalid_access_token','unauthorized','unauthorized_client','forbidden','invalid_client','invalid_scope','invalid_grant','invalid_request','unsupported_grant_type','not_found','bad_request','validation_error','invalid_parameters','invalid_email','invalid_customer_email','customer_already_exists','local_rate_limited','too_many_requests','PA_UNAUTHORIZED_RESULT_FROM_POLICIES','PA_UNAUTHORIZED_RESULT_FROM_AUTHORIZATION'];
             $known=array_merge($known,array_map('strval',range(100,129)),['140','150','200','201','202','203','204','205','206','207','208','214']);
+            // Códigos da Payments API: somente valores publicados, sem copiar description/message.
+            $known=array_merge($known,['4','2042','2059','2062','2067','2072','2077','2123','2131','3000','3001','3002','3003','3004','3005','3006','3007','3008','3009','3010','3011','3012','3013','3014','3015','3016','3017','3018','3019','3020','3021','3022','3023','3024','3025','3026','3027','3028','3029','3030','3031','3032','3033','3034','4000','4001','4002','4003','4004','4005','4006','4012','4013','4015','4016','4017','4018','4019','4020','4021','4022','4023','4024','4025','4026','4027','4028','4029','4033','4037','4038','4039','4050','4051','4292','6033','7523','pa_unauthorized_result_from_policies']);
             // bad_request genérico não deve esconder uma causa específica, por exemplo 128 (e-mail de teste).
             $causes=[];$messages[]=$r['message']??null;
             foreach(['cause','causes','errors'] as $key)if(is_array($r[$key]??null)){
@@ -84,4 +89,10 @@ final class MercadoPagoTestHttp implements PaymentTestTransport {
         $exact=preg_replace_callback('/"(?:[^"\\\\]|\\\\.)*"|(-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/s',static fn($m)=>isset($m[1])?json_encode($m[1],JSON_THROW_ON_ERROR):$m[0],$raw);
         $d=json_decode($exact,true,64,JSON_THROW_ON_ERROR);if(!is_array($d))throw new \UnexpectedValueException();return $d;
     }
+}
+
+// Criada somente pelo transporte acima, que reduz a resposta a etapas/códigos fixos.
+// Fica no mesmo arquivo para que a atualização do transporte seja um conjunto indivisível.
+final class MercadoPagoTestFailure extends Problem {
+    public function __construct(string $message,int $status,string $error,public readonly string $diagnostic){parent::__construct($message,$status,$error);}
 }

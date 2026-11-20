@@ -5,7 +5,7 @@ if(PHP_SAPI!=='cli'||config()['environment']!=='demo'||!preg_match('/dbname=pisc
 final class FakeMercadoPagoTestHttp implements Piscina\PaymentTestTransport {
     public array $credential=['access_token'=>'TEST-12345-111712-0123456789abcdef0123456789abcdef-23456','public_key'=>'TEST-12345678-1234-4321-9876-123456789abc','token_type'=>'bearer','user_id'=>'23456','live_mode'=>false,'expires_in'=>'3600'];
     public array $userOverride=[];public ?array $methodRows=null;public bool $rejectIdentity=false,$omitPublicKey=false;public int $userQueries=0,$cardQueries=0;
-    public array $payments=[],$posts=[],$overrides=[],$cardOverride=[];public string $nextStatus='approved';public ?string $getStatus=null;public bool $lostAfterPost=false,$lostBeforePost=false,$rejectPost=false,$rejectGet=false;public int $creates=0,$queries=0,$oauth=0;public static int $next=10000;public ?Closure $hook=null;
+    public array $payments=[],$posts=[],$overrides=[],$cardOverride=[],$failureBody=['error'=>'bad_request','cause'=>[['code'=>3003]]];public string $nextStatus='approved';public ?string $getStatus=null;public bool $lostAfterPost=false,$lostBeforePost=false,$rejectPost=false,$rejectGet=false;public int $creates=0,$queries=0,$oauth=0;public static int $next=10000;public ?Closure $hook=null;
     public function request(string $method,string $path,?string $body=null,array $headers=[]): array {
         if($path==='/oauth/token'){$this->oauth++;$d=json_decode($body,true);check(($d['test_token']??null)===true,'OAuth sempre solicita teste.');assertSame('client_credentials',$d['grant_type']);return $this->credential;}
         if(!in_array('Authorization: Bearer '.$this->credential['access_token'],$headers,true))throw new Piscina\Problem('Credencial recusada pelo transporte local.',422,'test_provider_rejected');
@@ -15,7 +15,7 @@ final class FakeMercadoPagoTestHttp implements Piscina\PaymentTestTransport {
         if(str_starts_with($path,'/v1/card_tokens/')){$this->cardQueries++;$id=substr($path,16);$debit=str_contains($id,'debit');$r=$this->cardOverride+['id'=>$id,'status'=>'active','date_due'=>gmdate('Y-m-d\TH:i:s\Z',time()+900),'live_mode'=>false,'public_key'=>$this->credential['public_key'],'first_six_digits'=>$debit?'506776':'548083','last_four_digits'=>$debit?'8311':'3311'];if($this->omitPublicKey)unset($r['public_key']);return $r;}
         if($method==='POST'&&$path==='/v1/payments'){
             $this->creates++;$p=Piscina\MercadoPagoTestHttp::decode($body);$this->posts[]=$p;check((bool)array_filter($headers,fn($h)=>str_starts_with($h,'X-Idempotency-Key: piscina-test-')),'Chave enviada ao provedor.');
-            if($this->lostBeforePost)throw new Piscina\Problem('Falha local injetada.',503,'test_provider_unavailable');if($this->rejectPost)throw new Piscina\Problem('Solicitação recusada pelo provedor local de teste.',422,'test_provider_rejected');$id=(string)++self::$next;
+            if($this->lostBeforePost)throw new Piscina\Problem('Falha local injetada.',503,'test_provider_unavailable');if($this->rejectPost)throw Piscina\MercadoPagoTestHttp::failure('POST','/v1/payments',400,json_encode($this->failureBody));$id=(string)++self::$next;
             $r=$this->overrides+['id'=>$id,'live_mode'=>false,'status'=>$this->nextStatus,'captured'=>true,'transaction_amount'=>$p['transaction_amount'],'transaction_amount_refunded'=>'0','currency_id'=>'BRL','collector_id'=>'23456','external_reference'=>$p['external_reference'],'metadata'=>$p['metadata'],'payment_method_id'=>$p['payment_method_id'],'payment_type_id'=>$p['payment_method_id']==='pix'?'bank_transfer':($p['payment_method_id']==='master'?'credit_card':'debit_card'),'date_last_updated'=>'2026-11-17T12:00:00.000Z'];
             $this->payments[$id]=$r;if($this->lostAfterPost){$this->lostAfterPost=false;throw new Piscina\Problem('Resposta perdida.',503,'test_provider_unavailable');}return $r;
         }
@@ -23,7 +23,7 @@ final class FakeMercadoPagoTestHttp implements Piscina\PaymentTestTransport {
         if(preg_match('~^/v1/payments/([0-9]+)$~D',$path,$m)){
             if(!isset($this->payments[$m[1]]))throw new Piscina\Problem('Não encontrado.',503,'test_provider_unavailable');
             if($method==='PUT'){$this->payments[$m[1]]['status']='cancelled';return $this->payments[$m[1]];}
-            $this->queries++;if($this->rejectGet)throw new Piscina\Problem('Consulta temporariamente não autorizada no transporte local.',422,'test_provider_rejected');$r=$this->payments[$m[1]];if($this->getStatus!==null)$r['status']=$this->getStatus;return $r;
+            $this->queries++;if($this->rejectGet)throw Piscina\MercadoPagoTestHttp::failure('GET',$path,403,json_encode($this->failureBody));$r=$this->payments[$m[1]];if($this->getStatus!==null)$r['status']=$this->getStatus;return $r;
         }
         throw new RuntimeException('Chamada inesperada no transporte de teste.');
     }

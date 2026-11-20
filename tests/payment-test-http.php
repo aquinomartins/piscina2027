@@ -81,9 +81,13 @@ namespace {
         [400,['error'=>'bad_request','cause'=>[['code'=>$secret,'description'=>$email]]],'bad_request'],
         [400,['error'=>'bad_request','cause'=>['code'=>128]],'128'],
         [400,['error'=>'bad_request','errors'=>[['code'=>125]]],'125'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>3003,'description'=>$secret.' '.$email.' '.$card]]],'3003'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>2067]]],'2067'],
+        [400,['error'=>'bad_request','cause'=>[['code'=>4050]]],'4050'],
+        [403,['code'=>'pa_unauthorized_result_from_policies'],'pa_unauthorized_result_from_policies'],
     ] as [$status,$body,$code]){
         $GLOBALS['payment_test_http_response']=['status'=>$status,'raw'=>json_encode($body)];
-        try{$http->request('GET','/users/me');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if($e->error!=='test_provider_rejected'||$e->status!==422||!str_contains($e->getMessage(),'HTTP: '.$status)||!str_contains($e->getMessage(),'Código: '.$code))throw new RuntimeException('Classificação de recusa alterada.');$diagnostics++;}
+        try{$http->request('GET','/users/me');throw new RuntimeException('Recusa deveria falhar.');}catch(Piscina\Problem $e){$safe($e->getMessage());if(!$e instanceof Piscina\MercadoPagoTestFailure)throw new RuntimeException('Falha sem diagnóstico tipado.');$safe($e->diagnostic);if($e->error!=='test_provider_rejected'||$e->status!==422||!str_contains($e->getMessage(),'HTTP: '.$status)||!str_contains($e->getMessage(),'Código: '.$code))throw new RuntimeException('Classificação de recusa alterada.');$diagnostics++;}
     }
     foreach([0,302,429,500,503,504] as $status){
         $GLOBALS['payment_test_http_response']=['status'=>$status,'raw'=>$secret.' '.$card.' '.$email,'ok'=>$status!==0];

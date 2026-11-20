@@ -251,3 +251,55 @@ executado com o Mercado Pago neste workspace.** As respostas do provedor/SDK
 foram simuladas somente nos testes. A confirmação do novo fluxo com a conta
 do usuário, incluindo disponibilidade do débito e comportamento real do Pix,
 permanece pendente na hospedagem. Não há aprovação local no runtime.
+
+## Recusa de envio preservada no comprovante — 20/11/2026
+
+A consulta fornecida da hospedagem mostrou duas tentativas `FAILED`, sem
+`provider_status`, crédito ou data de lançamento. Uma guardava
+`test_provider_rejected`; outra mostrava `test_not_found_yet` após consulta.
+Isso comprova ausência de aprovação registrada, sem revelar a causa específica
+da recusa HTTP original. Não foi feito lançamento manual no banco do usuário.
+
+O transporte agora entrega uma exceção própria com somente o contexto já
+sanitizado: etapa fixa, HTTP e código/detalhe de lista fechada. A orquestração
+persiste esse contexto em `PROVIDER_FAILURE` e o devolve ao Admin no
+comprovante. Não persiste mensagens de exceções genéricas nem corpo bruto do
+provedor. Consultar referência vazia mantém a causa de uma tentativa `FAILED`.
+O diagnóstico atual deixa de aparecer após consulta válida e crédito concluído;
+o evento histórico permanece. Erros conhecidos da Payments API, incluindo
+3003, 2067 e 4050, deixam de ser escondidos por `bad_request` genérico.
+
+Tentativas antigas sem esse evento continuam sem detalhes recuperáveis. A UI
+informa essa limitação, distingue falha de envio de recusa de pagamento criado
+e mostra o estado efetivamente consultado no provedor. Os critérios para
+aprovar e lançar o crédito, suas carteiras, idempotência e rollback permanecem
+os mesmos. A alteração usa as tabelas da 007; não há migração adicional.
+
+Verificação da revisão atual:
+
+- **38 cenários de pagamentos sem falhas**, PHP 8.3.36/MySQL 8.0.46 reais,
+  com respostas controladas do provedor. Dois casos novos comprovam
+  persistência segura do motivo, ausência de reenvio/crédito após recusa,
+  preservação da causa após busca vazia e recuperação da consulta inicialmente
+  recusada sem aprovar pela resposta de criação. Regressões incluem nove
+  combinações de meio/destino, crédito utilizável em prêmio, concorrência,
+  rollback, Webhooks e isolamento por permissão.
+- **56 verificações HTTP**, 20 de rotas/host e 36 de sanitização/classificação,
+  com cURL interceptado no teste CLI. Códigos específicos com segredos
+  injetados nas descrições não vazam para mensagem ou contexto persistível.
+- **Dez grupos de navegador**, com autorização PHP/MySQL real e UI ativa
+  com API/SDK controlados. O diagnóstico de envio permanece após reabrir o
+  comprovante; tentativas antigas não inventam detalhes ou crédito. Chromium
+  a 360/390/430/1440 px, sem overflow/erros JavaScript e botões de pelo menos
+  44 px. A captura do diagnóstico mobile foi inspecionada visualmente.
+
+O runtime alterado nesta revisão se limita a quatro arquivos do módulo/Admin:
+`MercadoPagoTestHttp.php`, `PaymentTests.php`, página e JavaScript da área.
+O minipacote continua entregando o conjunto compatível de seis arquivos.
+Configuração privada, SQL, ledger e app normal não foram alterados.
+
+**Nenhuma credencial do usuário ou chamada autenticada ao Mercado Pago foi
+usada nesta revisão.** A documentação oficial da Payments API foi consultada;
+os resultados externos foram simulados nos testes. A causa exata da recusa da
+hospedagem e a aprovação real de teste precisam ser verificadas com o novo
+diagnóstico. Não foi repetida a regressão completa de todo o aplicativo.

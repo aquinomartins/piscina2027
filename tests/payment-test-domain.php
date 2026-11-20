@@ -89,6 +89,18 @@ test('Pagamentos teste: ausência de pagamento não vira aprovação local',func
     [$p,$h]=ptfixture();$h->rejectPost=true;$r=$p->create(1,ptdata(),testKey());assertSame('FAILED',$r['state']);assertSame(null,$r['provider_id']);assertSame(0,ptcreditCount());
     [$p,$h]=ptfixture();$h->rejectGet=true;$r=$p->create(1,ptdata(),testKey());assertSame('UNKNOWN',$r['state']);check($r['provider_id']!==null,'Consulta falhou depois da criação.');assertSame(0,ptcreditCount());$h->rejectGet=false;$p->refresh(1,$r['id']);assertSame(1,ptcreditCount());
 });
+test('Pagamentos teste: recusa conserva diagnóstico seguro após leitura, consulta vazia e repetição',function(){
+    [$p,$h]=ptfixture();$h->rejectPost=true;$private=['TEST-SEGREDO_LOCAL_NAO_PERSISTIR','privado@local.invalid','PAN_CVV_CPF_PRIVADOS'];
+    $h->failureBody=['error'=>'bad_request','message'=>implode(' ',$private),'access_token'=>$private[0],'cause'=>[['code'=>3003,'description'=>implode(' ',$private)]]];
+    $key=testKey();$data=ptdata(amount:'888.00');$r=$p->create(1,$data,$key);assertSame('FAILED',$r['state']);assertSame(null,$r['provider_status']);assertSame(null,$r['credit_transaction_id']);check(str_contains($r['provider_failure'],'envio do pagamento'),'Etapa da recusa preservada.');check(str_contains($r['provider_failure'],'HTTP: 400'),'HTTP preservado.');check(str_contains($r['provider_failure'],'Código: 3003'),'Causa específica preservada.');$diagnostic=$r['provider_failure'];
+    assertSame($diagnostic,$p->read(1,$r['id'])['provider_failure']);$again=$p->create(1,$data,$key);assertSame($r['id'],$again['id']);assertSame(1,$h->creates);
+    $after=$p->refresh(1,$r['id']);assertSame('FAILED',$after['state']);assertSame('test_provider_rejected',$after['error_code']);assertSame($diagnostic,$after['provider_failure']);assertSame(1,$h->creates);assertSame(0,ptcreditCount());
+    foreach(['payment_test_intents','payment_test_events','operations','audit_events'] as $table){$raw=json_encode(db()->all('SELECT * FROM '.$table));foreach($private as $secret)check(!str_contains($raw,$secret),'Diagnóstico não retém corpo bruto ou segredos.');}
+});
+test('Pagamentos teste: consulta recusada não aprova por resposta de criação e diagnóstico some após crédito válido',function(){
+    [$p,$h]=ptfixture();$h->rejectGet=true;$h->failureBody=['error'=>'forbidden'];$r=$p->create(1,ptdata(),testKey());assertSame('UNKNOWN',$r['state']);check($r['provider_id']!==null,'ID da criação preservado.');check(str_contains($r['provider_failure'],'consulta do pagamento'),'Recusa da consulta identificada.');assertSame(0,ptcreditCount());
+    $h->rejectGet=false;$after=$p->refresh(1,$r['id']);assertSame('APPROVED',$after['state']);assertSame(null,$after['provider_failure']);assertSame('10001',balance(1,'MR'));$p->refresh(1,$r['id']);assertSame(1,ptcreditCount());assertSame(1,$h->creates);
+});
 test('Pagamentos teste: cancelar tentativa ainda não registrada bloqueia envio atrasado',function(){
     [$p,$h]=ptfixture();$key=testKey();$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);
     $key=testKey();$h->hook=fn()=>$p->abandon(1,$key);fail(fn()=>$p->create(1,ptdata(),$key));assertSame(0,$h->creates);
